@@ -201,5 +201,14 @@ class GraphSetup:
 
         workflow.add_edge("Risk Judge", END)
 
-        # Compile and return
-        return workflow.compile()
+        # Compile the graph
+        complied_workflow = workflow.compile()
+
+        # Generate mermaid diagram and save to a file
+        with open("results/workflow.md", "w") as f:
+            f.write("```mermaid\n")
+            f.write(complied_workflow.get_graph().draw_mermaid())
+            f.write("\n```")
+
+        # Return the compiled graph
+        return complied_workflow
