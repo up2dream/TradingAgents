@@ -41,6 +41,37 @@ def print_config_info(config):
     print()
 
 
+def format_duration(seconds):
+    """Format duration in seconds to a human-readable string."""
+    if seconds < 60:
+        return f"{seconds:.2f} seconds"
+    elif seconds < 3600:
+        minutes = int(seconds // 60)
+        remaining_seconds = seconds % 60
+        return f"{minutes}m {remaining_seconds:.2f}s"
+    else:
+        hours = int(seconds // 3600)
+        remaining_minutes = int((seconds % 3600) // 60)
+        remaining_seconds = seconds % 60
+        return f"{hours}h {remaining_minutes}m {remaining_seconds:.2f}s"
+
+
+def print_execution_summary(start_time, end_time):
+    """Print execution time summary."""
+    duration = end_time - start_time
+
+    print("\n" + "=" * 60)
+    print("EXECUTION SUMMARY")
+    print("=" * 60)
+    print(f"⏰ Start Time: {datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"🏁 End Time: {datetime.fromtimestamp(end_time).strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"⏱️  Total Duration: {format_duration(duration)}")
+    print("=" * 60)
+
+
+# Record start time
+start_time = time.time()
+
 # Create a custom config
 config = DEFAULT_CONFIG.copy()
 # config["llm_provider"] = "google"  # Use a different model
@@ -53,12 +84,24 @@ config = DEFAULT_CONFIG.copy()
 # Print configuration information
 print_config_info(config)
 
-# Initialize with custom config
-ta = TradingAgentsGraph(debug=True, config=config)
+print(f"🚀 Starting trading analysis at {datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')}")
+print()
 
-# forward propagate
-_, decision = ta.propagate("688111", "2025-08-03")
-print(decision)
+try:
+    # Initialize with custom config
+    ta = TradingAgentsGraph(debug=True, config=config)
 
-# Memorize mistakes and reflect
-# ta.reflect_and_remember(1000) # parameter is the position returns
+    # forward propagate
+    _, decision = ta.propagate("688111", "2025-08-03")
+    print(decision)
+
+    # Memorize mistakes and reflect
+    # ta.reflect_and_remember(1000) # parameter is the position returns
+
+except Exception as e:
+    print(f"❌ Error occurred during execution: {e}")
+    raise
+finally:
+    # Record end time and print summary
+    end_time = time.time()
+    print_execution_summary(start_time, end_time)
