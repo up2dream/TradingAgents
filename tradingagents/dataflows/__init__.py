@@ -14,6 +14,7 @@ from .interface import (
     get_google_news,
     get_reddit_global_news,
     get_reddit_company_news,
+    get_china_focused_news_openai,
     # Financial statements functions
     get_simfin_balance_sheet,
     get_simfin_cashflow,
@@ -35,6 +36,7 @@ __all__ = [
     "get_google_news",
     "get_reddit_global_news",
     "get_reddit_company_news",
+    "get_china_focused_news_openai",
     # Financial statements functions
     "get_simfin_balance_sheet",
     "get_simfin_cashflow",

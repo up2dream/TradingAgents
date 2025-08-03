@@ -399,6 +399,25 @@ class Toolkit:
 
     @staticmethod
     @tool
+    def get_china_focused_news_openai(
+        curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
+    ):
+        """
+        Retrieve the latest China-focused economic and market news using OpenAI's news API.
+        This function specifically focuses on Chinese economic indicators, market news, policy changes,
+        and China-related international economic news that would be relevant for trading Chinese stocks.
+        Args:
+            curr_date (str): Current date in yyyy-mm-dd format
+        Returns:
+            str: A formatted string containing the latest China-focused economic and market news.
+        """
+
+        china_news_results = interface.get_china_focused_news_openai(curr_date)
+
+        return china_news_results
+
+    @staticmethod
+    @tool
     def get_fundamentals_openai(
         ticker: Annotated[str, "the company's ticker"],
         curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
