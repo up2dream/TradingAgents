@@ -4,6 +4,7 @@ from .yfin_utils import YFinanceUtils
 from .reddit_utils import fetch_top_from_category
 from .stockstats_utils import StockstatsUtils
 from .yfin_utils import YFinanceUtils
+from .tushare_utils import TushareUtils, get_tushare_utils
 
 from .interface import (
     # News and sentiment functions
@@ -23,6 +24,7 @@ from .interface import (
     # Market data functions
     get_YFin_data_window,
     get_YFin_data,
+    get_tushare_data_online,
 )
 
 __all__ = [
@@ -43,4 +45,8 @@ __all__ = [
     # Market data functions
     "get_YFin_data_window",
     "get_YFin_data",
+    "get_tushare_data_online",
+    # Utility classes
+    "TushareUtils",
+    "get_tushare_utils",
 ]

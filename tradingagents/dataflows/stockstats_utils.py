@@ -55,23 +55,42 @@ class StockstatsUtils:
 
             data_file = os.path.join(
                 config["data_cache_dir"],
-                f"{symbol}-YFin-data-{start_date}-{end_date}.csv",
+                f"{symbol}-data-{start_date}-{end_date}.csv",
             )
 
             if os.path.exists(data_file):
                 data = pd.read_csv(data_file)
                 data["Date"] = pd.to_datetime(data["Date"])
             else:
-                data = yf.download(
-                    symbol,
-                    start=start_date,
-                    end=end_date,
-                    multi_level_index=False,
-                    progress=False,
-                    auto_adjust=True,
-                )
-                data = data.reset_index()
-                data.to_csv(data_file, index=False)
+                # Try Tushare first for Chinese stocks
+                data = None
+                try:
+                    from .tushare_utils import get_tushare_utils
+                    tushare_utils = get_tushare_utils()
+
+                    if tushare_utils.is_chinese_stock(symbol):
+                        data = tushare_utils.get_stock_data(symbol, start_date, end_date)
+                        if not data.empty:
+                            # Ensure Date column is properly formatted
+                            if 'Date' not in data.columns:
+                                data = data.reset_index()
+                            data.to_csv(data_file, index=False)
+                except Exception as e:
+                    print(f"Tushare failed for {symbol}: {e}, falling back to Yahoo Finance")
+                    data = None
+
+                # Fallback to Yahoo Finance if Tushare fails or for non-Chinese stocks
+                if data is None or data.empty:
+                    data = yf.download(
+                        symbol,
+                        start=start_date,
+                        end=end_date,
+                        multi_level_index=False,
+                        progress=False,
+                        auto_adjust=True,
+                    )
+                    data = data.reset_index()
+                    data.to_csv(data_file, index=False)
 
             df = wrap(data)
             df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")

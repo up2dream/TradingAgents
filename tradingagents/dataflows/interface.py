@@ -12,6 +12,7 @@ import os
 import pandas as pd
 from tqdm import tqdm
 import yfinance as yf
+import tushare as ts
 from openai import OpenAI
 from .config import get_config, set_config, DATA_DIR
 
@@ -630,41 +631,118 @@ def get_YFin_data_online(
     start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
     end_date: Annotated[str, "End date in yyyy-mm-dd format"],
 ):
+    from .tushare_utils import get_tushare_utils
 
     datetime.strptime(start_date, "%Y-%m-%d")
     datetime.strptime(end_date, "%Y-%m-%d")
 
-    # Create ticker object
-    ticker = yf.Ticker(symbol.upper())
+    # Try Tushare first for Chinese stocks
+    try:
+        tushare_utils = get_tushare_utils()
+        if tushare_utils.is_chinese_stock(symbol):
+            data = tushare_utils.get_stock_data(symbol, start_date, end_date)
 
-    # Fetch historical data for the specified date range
-    data = ticker.history(start=start_date, end=end_date)
+            if not data.empty:
+                # Set Date as index for consistency with Yahoo Finance format
+                data = data.set_index('Date')
 
-    # Check if data is empty
-    if data.empty:
-        return (
-            f"No data found for symbol '{symbol}' between {start_date} and {end_date}"
-        )
+                # Round numerical values to 2 decimal places for cleaner display
+                numeric_columns = ["Open", "High", "Low", "Close", "Adj Close"]
+                for col in numeric_columns:
+                    if col in data.columns:
+                        data[col] = data[col].round(2)
 
-    # Remove timezone info from index for cleaner output
-    if data.index.tz is not None:
-        data.index = data.index.tz_localize(None)
+                # Convert DataFrame to CSV string
+                csv_string = data.to_csv()
 
-    # Round numerical values to 2 decimal places for cleaner display
-    numeric_columns = ["Open", "High", "Low", "Close", "Adj Close"]
-    for col in numeric_columns:
-        if col in data.columns:
-            data[col] = data[col].round(2)
+                # Add header information
+                header = f"# Stock data for {symbol.upper()} from {start_date} to {end_date} (Tushare)\n"
+                header += f"# Total records: {len(data)}\n"
+                header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
 
-    # Convert DataFrame to CSV string
-    csv_string = data.to_csv()
+                return header + csv_string
+    except Exception as e:
+        print(f"Tushare failed for {symbol}: {e}, falling back to Yahoo Finance")
 
-    # Add header information
-    header = f"# Stock data for {symbol.upper()} from {start_date} to {end_date}\n"
-    header += f"# Total records: {len(data)}\n"
-    header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    # Fallback to Yahoo Finance for non-Chinese stocks or if Tushare fails
+    try:
+        # Create ticker object
+        ticker = yf.Ticker(symbol.upper())
 
-    return header + csv_string
+        # Fetch historical data for the specified date range
+        data = ticker.history(start=start_date, end=end_date)
+
+        # Check if data is empty
+        if data.empty:
+            return (
+                f"No data found for symbol '{symbol}' between {start_date} and {end_date}"
+            )
+
+        # Remove timezone info from index for cleaner output
+        if data.index.tz is not None:
+            data.index = data.index.tz_localize(None)
+
+        # Round numerical values to 2 decimal places for cleaner display
+        numeric_columns = ["Open", "High", "Low", "Close", "Adj Close"]
+        for col in numeric_columns:
+            if col in data.columns:
+                data[col] = data[col].round(2)
+
+        # Convert DataFrame to CSV string
+        csv_string = data.to_csv()
+
+        # Add header information
+        header = f"# Stock data for {symbol.upper()} from {start_date} to {end_date} (Yahoo Finance)\n"
+        header += f"# Total records: {len(data)}\n"
+        header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+
+        return header + csv_string
+
+    except Exception as e:
+        return f"Error fetching data for symbol '{symbol}': {e}"
+
+
+def get_tushare_data_online(
+    symbol: Annotated[str, "Chinese stock ticker symbol (e.g., '000001' or '600000')"],
+    start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
+    end_date: Annotated[str, "End date in yyyy-mm-dd format"],
+):
+    """
+    Retrieve Chinese stock data using Tushare API
+    """
+    from .tushare_utils import get_tushare_utils
+
+    datetime.strptime(start_date, "%Y-%m-%d")
+    datetime.strptime(end_date, "%Y-%m-%d")
+
+    try:
+        tushare_utils = get_tushare_utils()
+        data = tushare_utils.get_stock_data(symbol, start_date, end_date)
+
+        if data.empty:
+            return f"No data found for Chinese stock '{symbol}' between {start_date} and {end_date}"
+
+        # Set Date as index for consistency
+        data = data.set_index('Date')
+
+        # Round numerical values to 2 decimal places for cleaner display
+        numeric_columns = ["Open", "High", "Low", "Close", "Adj Close"]
+        for col in numeric_columns:
+            if col in data.columns:
+                data[col] = data[col].round(2)
+
+        # Convert DataFrame to CSV string
+        csv_string = data.to_csv()
+
+        # Add header information
+        header = f"# Chinese stock data for {symbol.upper()} from {start_date} to {end_date} (Tushare)\n"
+        header += f"# Total records: {len(data)}\n"
+        header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+
+        return header + csv_string
+
+    except Exception as e:
+        return f"Error fetching Chinese stock data for '{symbol}': {e}"
 
 
 def get_YFin_data(
