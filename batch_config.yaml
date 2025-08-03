@@ -1,0 +1,7 @@
+analysis_date: '2025-08-03'
+batch_results_dir: ./batch_results
+max_concurrent: 1
+results_base_dir: ./results
+stocks:
+- 688111.SH  # 金山办公 (测试用)
+timeout_minutes: 7
