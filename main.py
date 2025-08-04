@@ -2,7 +2,10 @@ from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 from dotenv import load_dotenv
 import time
+import argparse
+import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 
 load_dotenv()
 
@@ -69,39 +72,87 @@ def print_execution_summary(start_time, end_time):
     print("=" * 60)
 
 
-# Record start time
-start_time = time.time()
+def main():
+    """Main function with command line argument support."""
+    parser = argparse.ArgumentParser(description="TradingAgents Stock Analysis")
+    parser.add_argument("--stock", "-s", default="688111", help="Stock symbol to analyze (default: 688111)")
+    parser.add_argument("--date", "-d", default="2025-08-03", help="Analysis date (default: 2025-08-03)")
+    parser.add_argument("--config-file", help="Custom config file path")
 
-# Create a custom config
-config = DEFAULT_CONFIG.copy()
-# config["llm_provider"] = "google"  # Use a different model
-# config["backend_url"] = "https://generativelanguage.googleapis.com/v1"  # Use a different backend
-# config["deep_think_llm"] = "gemini-2.0-flash"  # Use a different model
-# config["quick_think_llm"] = "gemini-2.0-flash"  # Use a different model
-# config["max_debate_rounds"] = 1  # Increase debate rounds
-# config["online_tools"] = True  # Increase debate rounds
+    args = parser.parse_args()
 
-# Print configuration information
-print_config_info(config)
+    # Record start time
+    start_time = time.time()
 
-print(f"🚀 Starting trading analysis at {datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')}")
-print()
+    # Create a custom config
+    config = DEFAULT_CONFIG.copy()
+    # config["llm_provider"] = "google"  # Use a different model
+    # config["backend_url"] = "https://generativelanguage.googleapis.com/v1"  # Use a different backend
+    # config["deep_think_llm"] = "gemini-2.0-flash"  # Use a different model
+    # config["quick_think_llm"] = "gemini-2.0-flash"  # Use a different model
+    # config["max_debate_rounds"] = 1  # Increase debate rounds
+    # config["online_tools"] = True  # Increase debate rounds
 
-try:
-    # Initialize with custom config
-    ta = TradingAgentsGraph(debug=True, config=config)
+    # Print configuration information
+    print_config_info(config)
 
-    # forward propagate
-    _, decision = ta.propagate("688111", "2025-08-03")
-    print(decision)
+    print(f"🚀 Starting trading analysis for {args.stock} on {args.date}")
+    print(f"⏰ Started at {datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')}")
+    print()
 
-    # Memorize mistakes and reflect
-    # ta.reflect_and_remember(1000) # parameter is the position returns
+    try:
+        # Create results directory structure
+        results_dir = Path(config["results_dir"]) / args.stock / args.date
+        results_dir.mkdir(parents=True, exist_ok=True)
+        report_dir = results_dir / "reports"
+        report_dir.mkdir(parents=True, exist_ok=True)
 
-except Exception as e:
-    print(f"❌ Error occurred during execution: {e}")
-    raise
-finally:
-    # Record end time and print summary
-    end_time = time.time()
-    print_execution_summary(start_time, end_time)
+        # Initialize with custom config
+        ta = TradingAgentsGraph(debug=True, config=config)
+
+        # forward propagate
+        final_state, decision = ta.propagate(args.stock, args.date)
+
+        print("\n" + "="*60)
+        print("🎯 FINAL TRADING DECISION")
+        print("="*60)
+        print(decision)
+        print("="*60)
+
+        # Save all reports to files
+        print(f"\n💾 Saving reports to: {report_dir}")
+
+        # Save individual report sections
+        report_sections = {
+            "market_report": "market_report.md",
+            "sentiment_report": "sentiment_report.md",
+            "news_report": "news_report.md",
+            "fundamentals_report": "fundamentals_report.md",
+            "investment_plan": "investment_plan.md",
+            "trader_investment_plan": "trader_investment_plan.md",
+            "final_trade_decision": "final_trade_decision.md"
+        }
+
+        for section_key, filename in report_sections.items():
+            if section_key in final_state and final_state[section_key]:
+                file_path = report_dir / filename
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(final_state[section_key])
+                print(f"✅ Saved {filename}")
+
+        print(f"📁 All reports saved to: {report_dir}")
+
+        # Memorize mistakes and reflect
+        # ta.reflect_and_remember(1000) # parameter is the position returns
+
+    except Exception as e:
+        print(f"❌ Error occurred during execution: {e}")
+        sys.exit(1)
+    finally:
+        # Record end time and print summary
+        end_time = time.time()
+        print_execution_summary(start_time, end_time)
+
+
+if __name__ == "__main__":
+    main()

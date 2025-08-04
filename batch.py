@@ -89,8 +89,10 @@ class BatchProcessor:
             json.dump(progress, f, indent=2, ensure_ascii=False)
     
     def run_analysis_for_stock(self, stock: str, analysis_date: str) -> bool:
-        """Run analysis for a single stock in a new console window."""
-        print(f"\n🔄 Starting analysis for {stock}...")
+        """Run analysis for a single stock in the current console."""
+        print(f"\n{'='*60}")
+        print(f"🔄 Starting analysis for {stock} on {analysis_date}")
+        print(f"{'='*60}")
 
         # Check if analysis already exists
         results_dir = Path(self.config['results_base_dir']) / stock / analysis_date
@@ -100,38 +102,27 @@ class BatchProcessor:
             print(f"✅ Analysis already exists for {stock}, skipping...")
             return True
 
-        # Create a temporary main.py with the specific stock
-        temp_main = f"temp_main_{stock.replace('.', '_').replace('-', '_')}.py"
-
         try:
-            # Read the original main.py and modify it
-            with open('main.py', 'r', encoding='utf-8') as f:
-                main_content = f.read()
+            # Ensure results directory exists
+            results_base_dir = Path(self.config['results_base_dir'])
+            results_base_dir.mkdir(exist_ok=True)
 
-            # Replace the stock symbol and date in main.py
-            modified_content = main_content.replace(
-                'ta.propagate("688111", "2025-08-03")',
-                f'ta.propagate("{stock}", "{analysis_date}")'
-            )
-
-            # Write temporary main file
-            with open(temp_main, 'w', encoding='utf-8') as f:
-                f.write(modified_content)
-
-            # Run the analysis directly in the current process for better control
-            print(f"🚀 Running analysis for {stock}...")
-
-            # Use subprocess to run the analysis
-            cmd = ['uv', 'run', temp_main]
+            # Prepare command to run main.py with arguments
+            cmd = ['uv', 'run', 'main.py', '--stock', stock, '--date', analysis_date]
 
             # Start the process with timeout
             timeout = self.config.get('timeout_minutes', 30) * 60
 
+            print(f"🚀 Running analysis for {stock}...")
+            print(f"⏰ Timeout: {timeout//60} minutes")
+            print(f"📝 Command: {' '.join(cmd)}")
+            print()
+
             try:
+                # Run the analysis process
                 result = subprocess.run(
                     cmd,
                     timeout=timeout,
-                    capture_output=True,
                     text=True,
                     cwd=os.getcwd()
                 )
@@ -139,29 +130,22 @@ class BatchProcessor:
                 if result.returncode == 0:
                     # Check if results were generated
                     if final_decision_file.exists():
-                        print(f"✅ Analysis completed successfully for {stock}")
+                        print(f"\n✅ Analysis completed successfully for {stock}")
                         return True
                     else:
-                        print(f"⚠️  Analysis process completed but no results found for {stock}")
-                        print(f"stdout: {result.stdout[-500:]}")  # Last 500 chars
-                        print(f"stderr: {result.stderr[-500:]}")  # Last 500 chars
+                        print(f"\n⚠️  Analysis process completed but no results found for {stock}")
                         return False
                 else:
-                    print(f"❌ Analysis failed for {stock} (return code: {result.returncode})")
-                    print(f"stderr: {result.stderr[-500:]}")  # Last 500 chars
+                    print(f"\n❌ Analysis failed for {stock} (return code: {result.returncode})")
                     return False
 
             except subprocess.TimeoutExpired:
-                print(f"⏰ Timeout reached for {stock} after {timeout} seconds")
+                print(f"\n⏰ Timeout reached for {stock} after {timeout//60} minutes")
                 return False
 
         except Exception as e:
-            print(f"❌ Error running analysis for {stock}: {e}")
+            print(f"\n❌ Error running analysis for {stock}: {e}")
             return False
-        finally:
-            # Clean up temporary file
-            if os.path.exists(temp_main):
-                os.remove(temp_main)
     
     def collect_results(self, stocks: List[str], analysis_date: str) -> Dict[str, Any]:
         """Collect analysis results from all completed stocks."""
@@ -258,19 +242,44 @@ class BatchProcessor:
         print(f"❌ Failed: {len(progress['failed'])}")
         print(f"⏳ Remaining: {len(progress['remaining'])}")
 
+        # Show analysis plan
+        if progress['remaining']:
+            print("\n" + "="*60)
+            print("📋 ANALYSIS PLAN")
+            print("="*60)
+            print(f"📊 Stocks to analyze: {len(progress['remaining'])}")
+            print(f"⏰ Estimated time: {len(progress['remaining']) * 15} minutes")
+            print(f"🔄 Each analysis will run sequentially in this console")
+            print("="*60)
+            print("\n🚀 Starting analysis automatically...")
+
         # Process remaining stocks
         with tqdm(total=len(progress['remaining']), desc="Analyzing stocks") as pbar:
             for stock in progress['remaining'].copy():
                 pbar.set_description(f"Analyzing {stock}")
 
-                success = self.run_analysis_for_stock(stock, analysis_date)
+                max_retries = 2  # Allow up to 2 retries for each stock
+                retry_count = 0
+                success = False
+
+                while retry_count <= max_retries and not success:
+                    if retry_count > 0:
+                        print(f"🔄 Retry {retry_count}/{max_retries} for {stock}")
+
+                    success = self.run_analysis_for_stock(stock, analysis_date)
+
+                    if not success and retry_count < max_retries:
+                        print(f"⚠️  Analysis failed for {stock}. Retrying...")
+                        retry_count += 1
+                    else:
+                        break
 
                 if success:
                     progress['completed'].append(stock)
                     print(f"✅ {stock} completed successfully")
                 else:
                     progress['failed'].append(stock)
-                    print(f"❌ {stock} failed")
+                    print(f"❌ {stock} failed after {retry_count} retries")
 
                 progress['remaining'].remove(stock)
                 self.save_progress(progress)
