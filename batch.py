@@ -257,10 +257,39 @@ class BatchProcessor:
         
         print(f"📄 Summary report generated: {summary_file}")
         
-        # Also save as JSON
+        # Also save as JSON with recommendations added
+        json_summary = summary.copy()
+
+        # Add recommendation field to existing recommendations
+        for stock, data in json_summary['recommendations'].items():
+            # Extract the recommendation from decision content
+            decision_content = data['decision_content']
+            recommendation = "UNKNOWN"
+
+            # Try to extract the recommendation more accurately
+            content_upper = decision_content.upper()
+
+            # Check for explicit recommendation patterns first
+            if "RECOMMENDATION: BUY" in content_upper or "FINAL TRANSACTION PROPOSAL: BUY" in content_upper:
+                recommendation = "BUY"
+            elif "RECOMMENDATION: SELL" in content_upper or "FINAL TRANSACTION PROPOSAL: SELL" in content_upper:
+                recommendation = "SELL"
+            elif "RECOMMENDATION: HOLD" in content_upper or "FINAL TRANSACTION PROPOSAL: HOLD" in content_upper:
+                recommendation = "HOLD"
+            # Fallback to general keyword search
+            elif "BUY" in content_upper and "SELL" not in content_upper:
+                recommendation = "BUY"
+            elif "SELL" in content_upper and "BUY" not in content_upper:
+                recommendation = "SELL"
+            elif "HOLD" in content_upper:
+                recommendation = "HOLD"
+
+            # Add recommendation field to existing data
+            data['recommendation'] = recommendation
+
         json_file = batch_results_dir / f"batch_summary_{timestamp}.json"
         with open(json_file, 'w', encoding='utf-8') as f:
-            json.dump(summary, f, indent=2, ensure_ascii=False)
+            json.dump(json_summary, f, indent=2, ensure_ascii=False)
         
         return summary_file
 
