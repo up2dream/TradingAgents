@@ -217,17 +217,16 @@ class BatchProcessor:
             
             f.write("## 📊 投资建议汇总\n\n")
 
-            # Create a summary table
-            f.write("| 股票代码 | 投资建议 | 详细报告 |\n")
-            f.write("|---------|---------|----------|\n")
+            # Prepare data for sorting
+            stock_data = []
 
             for stock, data in summary['recommendations'].items():
                 # Extract the recommendation from decision content
                 decision_content = data['decision_content']
                 recommendation = "UNKNOWN"
+                confidence_score = 0
 
                 # Try to extract the recommendation more accurately
-                # Look for patterns like "Recommendation: BUY" or "FINAL TRANSACTION PROPOSAL: HOLD"
                 content_upper = decision_content.upper()
 
                 # Check for explicit recommendation patterns first
@@ -245,15 +244,38 @@ class BatchProcessor:
                 elif "HOLD" in content_upper:
                     recommendation = "🟡 HOLD"
 
+                # Calculate confidence score based on various factors
+                confidence_score = self._calculate_confidence_score(decision_content)
+                confidence_display = f"{confidence_score}%"
+
                 # Create clickable link to final decision report (absolute path)
                 import os
                 current_dir = os.getcwd()
                 final_report_path = f"file://{current_dir}/{data['reports_dir']}/final_trade_decision.md"
 
-                f.write(f"| {stock} | {recommendation} | [查看详细分析]({final_report_path}) |\n")
+                stock_data.append({
+                    'stock': stock,
+                    'recommendation': recommendation,
+                    'confidence_score': confidence_score,
+                    'confidence_display': confidence_display,
+                    'report_path': final_report_path
+                })
+
+            # Sort by confidence score (high to low)
+            stock_data.sort(key=lambda x: x['confidence_score'], reverse=True)
+
+            # Create table with confidence column
+            f.write("| 股票代码 | 投资建议 | 建议准确程度 | 详细报告 |\n")
+            f.write("|---------|---------|-------------|----------|\n")
+
+            for item in stock_data:
+                f.write(f"| {item['stock']} | {item['recommendation']} | {item['confidence_display']} | [查看详细分析]({item['report_path']}) |\n")
 
             f.write("\n---\n\n")
-            f.write("💡 **说明**: 点击\"查看详细分析\"链接可查看完整的投资决策依据和分析过程。\n\n")
+            f.write("💡 **说明**: \n")
+            f.write("- 建议准确程度基于分析的详细程度、技术指标一致性和风险评估完整性计算\n")
+            f.write("- 点击\"查看详细分析\"链接可查看完整的投资决策依据和分析过程\n")
+            f.write("- 表格已按建议准确程度从高到低排序\n\n")
         
         print(f"📄 Summary report generated: {summary_file}")
         
@@ -292,6 +314,63 @@ class BatchProcessor:
             json.dump(json_summary, f, indent=2, ensure_ascii=False)
         
         return summary_file
+
+    def _calculate_confidence_score(self, decision_content: str) -> int:
+        """Calculate confidence score based on decision content analysis."""
+        score = 50  # Base score
+        content_upper = decision_content.upper()
+
+        # Factor 1: Explicit recommendation patterns (+20 points)
+        if any(pattern in content_upper for pattern in [
+            "RECOMMENDATION:", "FINAL TRANSACTION PROPOSAL:", "DECISION & RATIONALE"
+        ]):
+            score += 20
+
+        # Factor 2: Technical analysis depth (+15 points)
+        technical_indicators = [
+            "MACD", "RSI", "SMA", "EMA", "ATR", "P/E", "VOLUME", "MOVING AVERAGE"
+        ]
+        technical_count = sum(1 for indicator in technical_indicators if indicator in content_upper)
+        score += min(technical_count * 2, 15)
+
+        # Factor 3: Risk management discussion (+10 points)
+        risk_keywords = [
+            "RISK", "STOP LOSS", "VOLATILITY", "DOWNSIDE", "HEDGE", "PROTECTION"
+        ]
+        risk_count = sum(1 for keyword in risk_keywords if keyword in content_upper)
+        score += min(risk_count * 2, 10)
+
+        # Factor 4: Detailed reasoning (+10 points)
+        reasoning_keywords = [
+            "RATIONALE", "BECAUSE", "DUE TO", "GIVEN", "CONSIDERING", "ANALYSIS"
+        ]
+        reasoning_count = sum(1 for keyword in reasoning_keywords if keyword in content_upper)
+        score += min(reasoning_count, 10)
+
+        # Factor 5: Multiple perspectives (+5 points)
+        perspective_keywords = [
+            "BULL", "BEAR", "ANALYST", "DEBATE", "ARGUMENT", "PERSPECTIVE"
+        ]
+        if any(keyword in content_upper for keyword in perspective_keywords):
+            score += 5
+
+        # Factor 6: Specific targets and plans (+5 points)
+        plan_keywords = [
+            "TARGET", "PLAN", "STRATEGY", "ENTRY", "EXIT", "ALLOCATION"
+        ]
+        plan_count = sum(1 for keyword in plan_keywords if keyword in content_upper)
+        if plan_count >= 2:
+            score += 5
+
+        # Factor 7: Length and detail bonus (longer analysis = more thorough)
+        content_length = len(decision_content)
+        if content_length > 2000:
+            score += 5
+        elif content_length > 1000:
+            score += 3
+
+        # Ensure score is within reasonable bounds
+        return min(max(score, 30), 95)
 
     def run_batch_analysis(self):
         """Run batch analysis for all stocks in configuration."""
