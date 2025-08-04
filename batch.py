@@ -3,7 +3,7 @@
 Batch processing script for TradingAgents analysis.
 
 Commands:
-- uv run batch.py run: Run analysis for stocks from yaml config
+- uv run batch.py run [--trade-date YYYY-MM-DD]: Run analysis for stocks from yaml config
 - uv run batch.py continue: Continue unfinished analysis
 - uv run batch.py clear: Clear all analysis results
 - uv run batch.py generate_stock_list --code 000688.SH [--append]: Generate stock list from index
@@ -28,11 +28,24 @@ PROGRESS_FILE = "batch_progress.json"
 SUMMARY_FILE = "batch_summary.json"
 
 class BatchProcessor:
-    def __init__(self, config_file: str = CONFIG_FILE):
+    def __init__(self, config_file: str = CONFIG_FILE, trade_date: Optional[str] = None):
         self.config_file = config_file
         self.progress_file = PROGRESS_FILE
         self.summary_file = SUMMARY_FILE
         self.config = self.load_config()
+        self.trade_date = self._validate_and_set_trade_date(trade_date)
+
+    def _validate_and_set_trade_date(self, trade_date: Optional[str]) -> str:
+        """Validate and set the trade date."""
+        if trade_date is None:
+            return str(date.today())
+
+        try:
+            # Validate date format
+            datetime.strptime(trade_date, '%Y-%m-%d')
+            return trade_date
+        except ValueError:
+            raise ValueError(f"Invalid date format: {trade_date}. Please use YYYY-MM-DD format.")
         
     def load_config(self) -> Dict[str, Any]:
         """Load configuration from yaml file."""
@@ -262,7 +275,8 @@ class BatchProcessor:
             progress['start_time'] = datetime.now().isoformat()
             progress['remaining'] = self.config['stocks'].copy()
 
-        analysis_date = self.config['analysis_date']
+        # Use trade_date parameter if provided, otherwise fall back to config
+        analysis_date = self.trade_date
         total_stocks = len(self.config['stocks'])
 
         print(f"📅 Analysis date: {analysis_date}")
@@ -481,7 +495,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  uv run batch.py run                                    # Run analysis for all stocks
+  uv run batch.py run                                    # Run analysis for all stocks (today's date)
+  uv run batch.py run --trade-date 2025-08-04           # Run analysis for specific date
   uv run batch.py continue                               # Continue unfinished analysis
   uv run batch.py clear                                  # Clear all results
   uv run batch.py generate_stock_list --code 000300.SH  # Generate from index (replace, all stocks)
@@ -494,6 +509,7 @@ Examples:
 
     # Run command
     run_parser = subparsers.add_parser('run', help='Run batch analysis for all stocks')
+    run_parser.add_argument('--trade-date', type=str, help='Trade date for analysis (YYYY-MM-DD format, default: today)')
 
     # Continue command
     continue_parser = subparsers.add_parser('continue', help='Continue unfinished analysis')
@@ -514,7 +530,10 @@ Examples:
         return
 
     # Initialize batch processor
-    processor = BatchProcessor()
+    if args.command == 'run':
+        processor = BatchProcessor(trade_date=args.trade_date)
+    else:
+        processor = BatchProcessor()
 
     # Execute command
     if args.command == 'run':
