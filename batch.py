@@ -203,15 +203,42 @@ class BatchProcessor:
                 f.write("\n")
             
             f.write("## 📊 投资建议汇总\n\n")
-            
+
+            # Create a summary table
+            f.write("| 股票代码 | 投资建议 | 详细报告 |\n")
+            f.write("|---------|---------|----------|\n")
+
             for stock, data in summary['recommendations'].items():
-                f.write(f"### {stock}\n\n")
-                f.write(f"**报告路径**: {data['reports_dir']}\n\n")
-                f.write("**投资决策**:\n")
-                f.write("```\n")
-                f.write(data['decision_content'])
-                f.write("\n```\n\n")
-                f.write("---\n\n")
+                # Extract the recommendation from decision content
+                decision_content = data['decision_content']
+                recommendation = "UNKNOWN"
+
+                # Try to extract the recommendation more accurately
+                # Look for patterns like "Recommendation: BUY" or "FINAL TRANSACTION PROPOSAL: HOLD"
+                content_upper = decision_content.upper()
+
+                # Check for explicit recommendation patterns first
+                if "RECOMMENDATION: BUY" in content_upper or "FINAL TRANSACTION PROPOSAL: BUY" in content_upper:
+                    recommendation = "🟢 BUY"
+                elif "RECOMMENDATION: SELL" in content_upper or "FINAL TRANSACTION PROPOSAL: SELL" in content_upper:
+                    recommendation = "🔴 SELL"
+                elif "RECOMMENDATION: HOLD" in content_upper or "FINAL TRANSACTION PROPOSAL: HOLD" in content_upper:
+                    recommendation = "🟡 HOLD"
+                # Fallback to general keyword search
+                elif "BUY" in content_upper and "SELL" not in content_upper:
+                    recommendation = "🟢 BUY"
+                elif "SELL" in content_upper and "BUY" not in content_upper:
+                    recommendation = "🔴 SELL"
+                elif "HOLD" in content_upper:
+                    recommendation = "🟡 HOLD"
+
+                # Create clickable link to final decision report
+                final_report_path = f"{data['reports_dir']}/final_trade_decision.md"
+
+                f.write(f"| {stock} | {recommendation} | [查看详细分析]({final_report_path}) |\n")
+
+            f.write("\n---\n\n")
+            f.write("💡 **说明**: 点击\"查看详细分析\"链接可查看完整的投资决策依据和分析过程。\n\n")
         
         print(f"📄 Summary report generated: {summary_file}")
         
