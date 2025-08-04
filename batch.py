@@ -338,13 +338,18 @@ class BatchProcessor:
 
         print("✅ All results cleared successfully!")
 
-    def generate_stock_list(self, index_code: str, append: bool = False):
+    def generate_stock_list(self, index_code: str, append: bool = False, limit: int = None):
         """Generate stock list from index code."""
         print(f"📈 Generating stock list for index: {index_code}")
 
         try:
             # Try to get real index constituents using akshare
             new_stocks = self._fetch_index_constituents(index_code)
+
+            # Apply limit if specified
+            if limit and len(new_stocks) > limit:
+                print(f"📊 Limiting to first {limit} stocks (out of {len(new_stocks)} total)")
+                new_stocks = new_stocks[:limit]
 
             if not new_stocks:
                 # Fallback to sample data
@@ -417,7 +422,8 @@ class BatchProcessor:
                         stocks.append(stock_code)
 
                     print(f"✅ Found {len(stocks)} constituents for {index_code}")
-                    return stocks[:20]  # Limit to first 20 stocks to avoid too many
+                    # Return all stocks by default, let user decide how many to use
+                    return stocks
 
             print(f"⚠️  Could not fetch constituents for {index_code}")
             return []
@@ -440,8 +446,9 @@ Examples:
   uv run batch.py run                                    # Run analysis for all stocks
   uv run batch.py continue                               # Continue unfinished analysis
   uv run batch.py clear                                  # Clear all results
-  uv run batch.py generate_stock_list --code 000300.SH  # Generate from index (replace)
-  uv run batch.py generate_stock_list --code 000300.SH --append  # Generate from index (append)
+  uv run batch.py generate_stock_list --code 000300.SH  # Generate from index (replace, all stocks)
+  uv run batch.py generate_stock_list --code 000300.SH --limit 20  # Generate first 20 stocks
+  uv run batch.py generate_stock_list --code 000688.SH --append    # Append to existing list
         """
     )
 
@@ -460,6 +467,7 @@ Examples:
     generate_parser = subparsers.add_parser('generate_stock_list', help='Generate stock list from index')
     generate_parser.add_argument('--code', required=True, help='Index code (e.g., 000300.SH)')
     generate_parser.add_argument('--append', action='store_true', help='Append to existing list instead of replacing')
+    generate_parser.add_argument('--limit', type=int, help='Limit number of stocks to fetch (default: all)')
 
     args = parser.parse_args()
 
@@ -478,7 +486,7 @@ Examples:
     elif args.command == 'clear':
         processor.clear_results()
     elif args.command == 'generate_stock_list':
-        processor.generate_stock_list(args.code, args.append)
+        processor.generate_stock_list(args.code, args.append, args.limit)
 
 
 if __name__ == "__main__":

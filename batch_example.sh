@@ -7,8 +7,8 @@ echo "🚀 TradingAgents 批量分析示例"
 echo "================================"
 
 echo ""
-echo "1. 生成沪深300成分股列表 (前20只)"
-uv run batch.py generate_stock_list --code 000300.SH
+echo "1. 生成沪深300成分股列表 (前10只)"
+uv run batch.py generate_stock_list --code 000300.SH --limit 10
 
 echo ""
 echo "2. 查看当前配置"
@@ -45,9 +45,11 @@ fi
 
 echo ""
 echo "5. 其他可用命令:"
-echo "   uv run batch.py continue                               # 继续未完成的分析"
-echo "   uv run batch.py clear                                  # 清除所有结果"
-echo "   uv run batch.py generate_stock_list --code 000688.SH --append  # 追加科创50成分股"
+echo "   uv run batch.py continue                                        # 继续未完成的分析"
+echo "   uv run batch.py clear                                           # 清除所有结果"
+echo "   uv run batch.py generate_stock_list --code 000688.SH            # 获取科创50全部成分股"
+echo "   uv run batch.py generate_stock_list --code 000688.SH --limit 20 # 获取科创50前20只"
+echo "   uv run batch.py generate_stock_list --code 000905.SH --append   # 追加中证500成分股"
 
 echo ""
 echo "✅ 示例完成!"

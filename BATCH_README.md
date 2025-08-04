@@ -51,11 +51,17 @@ uv run batch.py continue
 ### 3. 生成股票列表
 
 ```bash
-# 从指数生成股票列表（替换现有列表）
+# 从指数生成股票列表（替换现有列表，获取所有成分股）
 uv run batch.py generate_stock_list --code 000300.SH
+
+# 限制获取前20只股票
+uv run batch.py generate_stock_list --code 000300.SH --limit 20
 
 # 追加到现有列表
 uv run batch.py generate_stock_list --code 000688.SH --append
+
+# 追加并限制数量
+uv run batch.py generate_stock_list --code 000688.SH --append --limit 10
 ```
 
 支持的指数代码：
