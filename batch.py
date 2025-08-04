@@ -232,8 +232,10 @@ class BatchProcessor:
                 elif "HOLD" in content_upper:
                     recommendation = "🟡 HOLD"
 
-                # Create clickable link to final decision report
-                final_report_path = f"{data['reports_dir']}/final_trade_decision.md"
+                # Create clickable link to final decision report (absolute path)
+                import os
+                current_dir = os.getcwd()
+                final_report_path = f"file://{current_dir}/{data['reports_dir']}/final_trade_decision.md"
 
                 f.write(f"| {stock} | {recommendation} | [查看详细分析]({final_report_path}) |\n")
 
