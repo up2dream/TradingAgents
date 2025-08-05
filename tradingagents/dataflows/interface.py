@@ -14,8 +14,18 @@ from tqdm import tqdm
 import yfinance as yf
 import tushare as ts
 from openai import OpenAI
-from google import genai
-from google.genai import types
+try:
+    from google import genai
+    from google.genai import types
+    GOOGLE_GENAI_AVAILABLE = True
+except ImportError:
+    try:
+        import google.generativeai as genai
+        GOOGLE_GENAI_AVAILABLE = False  # Use fallback implementation
+        print("Warning: google.genai not available, falling back to google.generativeai")
+    except ImportError:
+        GOOGLE_GENAI_AVAILABLE = False
+        print("Warning: Google Gemini integration not available")
 from .config import get_config, set_config, DATA_DIR
 
 
@@ -978,34 +988,55 @@ def get_china_focused_news_openai(curr_date):
 
 
 def get_fundamentals_openai(ticker, curr_date):
+    """
+    Get fundamental data for a stock. For Chinese stocks, use Tushare API.
+    For international stocks, use web search via OpenAI/Google.
+    """
     config = get_config()
 
-    # Check if using Google provider
-    if config.get("llm_provider", "").lower() == "google":
-        # Configure the Gemini client
-        client = genai.Client()
+    # First, check if this is a Chinese stock and try Tushare
+    try:
+        from .tushare_utils import get_tushare_utils
+        tushare_utils = get_tushare_utils()
 
-        # Define the grounding tool for Google Search
-        grounding_tool = types.Tool(
-            google_search=types.GoogleSearch()
-        )
+        if tushare_utils.is_chinese_stock(ticker):
+            print(f"Detected Chinese stock {ticker}, using Tushare for fundamental data...")
+            fundamental_data = tushare_utils.get_fundamental_data(ticker, curr_date)
+            return tushare_utils.format_fundamental_report(fundamental_data)
+    except Exception as e:
+        print(f"Tushare fundamental data failed for {ticker}: {e}, falling back to web search")
 
-        # Configure generation settings
-        generation_config = types.GenerateContentConfig(
-            tools=[grounding_tool],
-            temperature=1,
-            max_output_tokens=4096,
-            top_p=1,
-        )
+    # Fallback to web search for international stocks or if Tushare fails
+    # Check if using Google provider and if Google Gemini is available
+    if config.get("llm_provider", "").lower() == "google" and GOOGLE_GENAI_AVAILABLE:
+        try:
+            # Configure the Gemini client
+            client = genai.Client()
 
-        # Make the request
-        response = client.models.generate_content(
-            model=config["quick_think_llm"],
-            contents=f"Can you search Fundamental for discussions on {ticker} during of the month before {curr_date} to the month of {curr_date}. Make sure you only get the data posted during that period. List as a table, with PE/PS/Cash flow/ etc",
-            config=generation_config,
-        )
+            # Define the grounding tool for Google Search
+            grounding_tool = types.Tool(
+                google_search=types.GoogleSearch()
+            )
 
-        return response.text
+            # Configure generation settings
+            generation_config = types.GenerateContentConfig(
+                tools=[grounding_tool],
+                temperature=1,
+                max_output_tokens=4096,
+                top_p=1,
+            )
+
+            # Make the request
+            response = client.models.generate_content(
+                model=config["quick_think_llm"],
+                contents=f"Can you search Fundamental for discussions on {ticker} during of the month before {curr_date} to the month of {curr_date}. Make sure you only get the data posted during that period. List as a table, with PE/PS/Cash flow/ etc",
+                config=generation_config,
+            )
+
+            return response.text
+        except Exception as e:
+            print(f"Google Gemini API failed: {e}, falling back to OpenAI")
+            # Fall through to OpenAI implementation
     else:
         # Original OpenAI implementation
         client = OpenAI(base_url=config["backend_url"])
