@@ -10,10 +10,19 @@ def create_social_media_analyst(llm, toolkit):
         company_name = state["company_of_interest"]
 
         if toolkit.config["online_tools"]:
-            tools = [toolkit.get_stock_news_openai]
+            tools = [
+                toolkit.get_stock_news_openai,
+                toolkit.get_china_social_media_openai,
+                toolkit.get_china_social_media_real_data,
+                toolkit.get_china_forum_data,
+                toolkit.get_china_comprehensive_social_media_data,
+            ]
         else:
             tools = [
                 toolkit.get_reddit_stock_info,
+                toolkit.get_china_social_media_real_data,  # Real data doesn't require online tools
+                toolkit.get_china_forum_data,  # Forum data doesn't require online tools
+                toolkit.get_china_comprehensive_social_media_data,  # Comprehensive data
             ]
 
         system_message = (
