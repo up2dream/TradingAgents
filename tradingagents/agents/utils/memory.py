@@ -1,25 +1,70 @@
 import chromadb
 from chromadb.config import Settings
 from openai import OpenAI
+import os
 
 
 class FinancialSituationMemory:
     def __init__(self, name, config):
-        if config["backend_url"] == "http://localhost:11434/v1":
+        self.config = config
+        self.llm_provider = config.get("llm_provider", "openai")
+
+        # Set up embedding model and client based on provider
+        if self.llm_provider == "google":
+            self.embedding = "embedding-001"
+            # For Google, we'll use a different approach
+            self.client = None
+            self.api_key = config.get("api_key") or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+            if not self.api_key:
+                raise ValueError("GEMINI_API_KEY or GOOGLE_API_KEY environment variable or api_key in config is required for Google provider")
+        elif config["backend_url"] == "http://localhost:11434/v1":
             self.embedding = "nomic-embed-text"
+            self.client = OpenAI(base_url=config["backend_url"])
         else:
             self.embedding = "text-embedding-3-small"
-        self.client = OpenAI(base_url=config["backend_url"])
+            self.client = OpenAI(base_url=config["backend_url"])
+
         self.chroma_client = chromadb.Client(Settings(allow_reset=True))
         self.situation_collection = self.chroma_client.create_collection(name=name)
 
     def get_embedding(self, text):
-        """Get OpenAI embedding for a text"""
-        
-        response = self.client.embeddings.create(
-            model=self.embedding, input=text
-        )
-        return response.data[0].embedding
+        """Get embedding for a text using the configured provider"""
+
+        if self.llm_provider == "google":
+            return self._get_google_embedding(text)
+        else:
+            # OpenAI or compatible API
+            response = self.client.embeddings.create(
+                model=self.embedding, input=text
+            )
+            return response.data[0].embedding
+
+    def _get_google_embedding(self, text):
+        """Get Google embedding using the Gemini API"""
+        import requests
+
+        url = f"https://generativelanguage.googleapis.com/v1/models/{self.embedding}:embedContent"
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        data = {
+            "model": f"models/{self.embedding}",
+            "content": {
+                "parts": [{"text": text}]
+            }
+        }
+
+        # Add API key to URL params
+        params = {"key": self.api_key}
+
+        response = requests.post(url, headers=headers, json=data, params=params)
+
+        if response.status_code != 200:
+            raise Exception(f"Google embedding API error: {response.status_code} - {response.text}")
+
+        result = response.json()
+        return result["embedding"]["values"]
 
     def add_situations(self, situations_and_advice):
         """Add financial situations and their corresponding advice. Parameter is a list of tuples (situation, rec)"""
@@ -45,7 +90,7 @@ class FinancialSituationMemory:
         )
 
     def get_memories(self, current_situation, n_matches=1):
-        """Find matching recommendations using OpenAI embeddings"""
+        """Find matching recommendations using embeddings"""
         query_embedding = self.get_embedding(current_situation)
 
         results = self.situation_collection.query(
