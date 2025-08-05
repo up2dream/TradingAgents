@@ -14,6 +14,8 @@ from tqdm import tqdm
 import yfinance as yf
 import tushare as ts
 from openai import OpenAI
+from google import genai
+from google.genai import types
 from .config import get_config, set_config, DATA_DIR
 
 
@@ -782,142 +784,258 @@ def get_YFin_data(
 
 def get_stock_news_openai(ticker, curr_date):
     config = get_config()
-    client = OpenAI(base_url=config["backend_url"])
 
-    response = client.responses.create(
-        model=config["quick_think_llm"],
-        input=[
-            {
-                "role": "system",
-                "content": [
-                    {
-                        "type": "input_text",
-                        "text": f"Can you search Social Media for {ticker} from 7 days before {curr_date} to {curr_date}? Make sure you only get the data posted during that period.",
-                    }
-                ],
-            }
-        ],
-        text={"format": {"type": "text"}},
-        reasoning={},
-        tools=[
-            {
-                "type": "web_search_preview",
-                "user_location": {"type": "approximate"},
-                "search_context_size": "low",
-            }
-        ],
-        temperature=1,
-        max_output_tokens=4096,
-        top_p=1,
-        store=True,
-    )
+    # Check if using Google provider
+    if config.get("llm_provider", "").lower() == "google":
+        # Configure the Gemini client
+        client = genai.Client()
 
-    return response.output[1].content[0].text
+        # Define the grounding tool for Google Search
+        grounding_tool = types.Tool(
+            google_search=types.GoogleSearch()
+        )
+
+        # Configure generation settings
+        generation_config = types.GenerateContentConfig(
+            tools=[grounding_tool],
+            temperature=1,
+            max_output_tokens=4096,
+            top_p=1,
+        )
+
+        # Make the request
+        response = client.models.generate_content(
+            model=config["quick_think_llm"],
+            contents=f"Can you search Social Media for {ticker} from 7 days before {curr_date} to {curr_date}? Make sure you only get the data posted during that period.",
+            config=generation_config,
+        )
+
+        return response.text
+    else:
+        # Original OpenAI implementation
+        client = OpenAI(base_url=config["backend_url"])
+
+        response = client.responses.create(
+            model=config["quick_think_llm"],
+            input=[
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": f"Can you search Social Media for {ticker} from 7 days before {curr_date} to {curr_date}? Make sure you only get the data posted during that period.",
+                        }
+                    ],
+                }
+            ],
+            text={"format": {"type": "text"}},
+            reasoning={},
+            tools=[
+                {
+                    "type": "web_search_preview",
+                    "user_location": {"type": "approximate"},
+                    "search_context_size": "low",
+                }
+            ],
+            temperature=1,
+            max_output_tokens=4096,
+            top_p=1,
+            store=True,
+        )
+
+        return response.output[1].content[0].text
 
 
 def get_global_news_openai(curr_date):
     config = get_config()
-    client = OpenAI(base_url=config["backend_url"])
 
-    response = client.responses.create(
-        model=config["quick_think_llm"],
-        input=[
-            {
-                "role": "system",
-                "content": [
-                    {
-                        "type": "input_text",
-                        "text": f"Can you search global or macroeconomics news from 7 days before {curr_date} to {curr_date} that would be informative for trading purposes? Please prioritize and include more Chinese economic news, Chinese market news, Chinese policy news, and China-related international trade news. Also include other major global economic news from US, Europe, and other regions. Make sure you only get the data posted during that period. Focus on: 1) Chinese economic indicators and policies (40% weight), 2) Chinese stock market and financial sector news (30% weight), 3) Global economic news affecting China (20% weight), 4) Other major global economic news (10% weight).",
-                    }
-                ],
-            }
-        ],
-        text={"format": {"type": "text"}},
-        reasoning={},
-        tools=[
-            {
-                "type": "web_search_preview",
-                "user_location": {"type": "approximate"},
-                "search_context_size": "medium",  # Increased context size for better coverage
-            }
-        ],
-        temperature=1,
-        max_output_tokens=4096,
-        top_p=1,
-        store=True,
-    )
+    # Check if using Google provider
+    if config.get("llm_provider", "").lower() == "google":
+        # Configure the Gemini client
+        client = genai.Client()
 
-    return response.output[1].content[0].text
+        # Define the grounding tool for Google Search
+        grounding_tool = types.Tool(
+            google_search=types.GoogleSearch()
+        )
+
+        # Configure generation settings
+        generation_config = types.GenerateContentConfig(
+            tools=[grounding_tool],
+            temperature=1,
+            max_output_tokens=4096,
+            top_p=1,
+        )
+
+        # Make the request
+        response = client.models.generate_content(
+            model=config["quick_think_llm"],
+            contents=f"Can you search global or macroeconomics news from 7 days before {curr_date} to {curr_date} that would be informative for trading purposes? Please prioritize and include more Chinese economic news, Chinese market news, Chinese policy news, and China-related international trade news. Also include other major global economic news from US, Europe, and other regions. Make sure you only get the data posted during that period. Focus on: 1) Chinese economic indicators and policies (40% weight), 2) Chinese stock market and financial sector news (30% weight), 3) Global economic news affecting China (20% weight), 4) Other major global economic news (10% weight).",
+            config=generation_config,
+        )
+
+        return response.text
+    else:
+        # Original OpenAI implementation
+        client = OpenAI(base_url=config["backend_url"])
+
+        response = client.responses.create(
+            model=config["quick_think_llm"],
+            input=[
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": f"Can you search global or macroeconomics news from 7 days before {curr_date} to {curr_date} that would be informative for trading purposes? Please prioritize and include more Chinese economic news, Chinese market news, Chinese policy news, and China-related international trade news. Also include other major global economic news from US, Europe, and other regions. Make sure you only get the data posted during that period. Focus on: 1) Chinese economic indicators and policies (40% weight), 2) Chinese stock market and financial sector news (30% weight), 3) Global economic news affecting China (20% weight), 4) Other major global economic news (10% weight).",
+                        }
+                    ],
+                }
+            ],
+            text={"format": {"type": "text"}},
+            reasoning={},
+            tools=[
+                {
+                    "type": "web_search_preview",
+                    "user_location": {"type": "approximate"},
+                    "search_context_size": "medium",  # Increased context size for better coverage
+                }
+            ],
+            temperature=1,
+            max_output_tokens=4096,
+            top_p=1,
+            store=True,
+        )
+
+        return response.output[1].content[0].text
 
 
 def get_china_focused_news_openai(curr_date):
     """
-    Get China-focused economic and market news using OpenAI API
+    Get China-focused economic and market news using OpenAI API or Google Gemini API
     """
     config = get_config()
-    client = OpenAI(base_url=config["backend_url"])
 
-    response = client.responses.create(
-        model=config["quick_think_llm"],
-        input=[
-            {
-                "role": "system",
-                "content": [
-                    {
-                        "type": "input_text",
-                        "text": f"Can you search for Chinese economic and financial market news from 7 days before {curr_date} to {curr_date} that would be informative for trading Chinese stocks? Please focus specifically on: 1) Chinese economic indicators (GDP, CPI, PMI, etc.), 2) Chinese monetary policy and central bank actions, 3) Chinese stock market news (A-shares, Hong Kong stocks), 4) Chinese regulatory changes affecting financial markets, 5) Chinese corporate earnings and major company news, 6) China-US trade relations and international economic relations, 7) Chinese real estate and property market news, 8) Chinese technology sector and policy changes. Make sure you only get the data posted during that period and prioritize Chinese sources and China-focused international coverage.",
-                    }
-                ],
-            }
-        ],
-        text={"format": {"type": "text"}},
-        reasoning={},
-        tools=[
-            {
-                "type": "web_search_preview",
-                "user_location": {"type": "approximate"},
-                "search_context_size": "high",  # High context for comprehensive coverage
-            }
-        ],
-        temperature=1,
-        max_output_tokens=4096,
-        top_p=1,
-        store=True,
-    )
+    # Check if using Google provider
+    if config.get("llm_provider", "").lower() == "google":
+        # Configure the Gemini client
+        client = genai.Client()
 
-    return response.output[1].content[0].text
+        # Define the grounding tool for Google Search
+        grounding_tool = types.Tool(
+            google_search=types.GoogleSearch()
+        )
+
+        # Configure generation settings
+        generation_config = types.GenerateContentConfig(
+            tools=[grounding_tool],
+            temperature=1,
+            max_output_tokens=4096,
+            top_p=1,
+        )
+
+        # Make the request
+        response = client.models.generate_content(
+            model=config["quick_think_llm"],
+            contents=f"Can you search for Chinese economic and financial market news from 7 days before {curr_date} to {curr_date} that would be informative for trading Chinese stocks? Please focus specifically on: 1) Chinese economic indicators (GDP, CPI, PMI, etc.), 2) Chinese monetary policy and central bank actions, 3) Chinese stock market news (A-shares, Hong Kong stocks), 4) Chinese regulatory changes affecting financial markets, 5) Chinese corporate earnings and major company news, 6) China-US trade relations and international economic relations, 7) Chinese real estate and property market news, 8) Chinese technology sector and policy changes. Make sure you only get the data posted during that period and prioritize Chinese sources and China-focused international coverage.",
+            config=generation_config,
+        )
+
+        return response.text
+    else:
+        # Original OpenAI implementation
+        client = OpenAI(base_url=config["backend_url"])
+
+        response = client.responses.create(
+            model=config["quick_think_llm"],
+            input=[
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": f"Can you search for Chinese economic and financial market news from 7 days before {curr_date} to {curr_date} that would be informative for trading Chinese stocks? Please focus specifically on: 1) Chinese economic indicators (GDP, CPI, PMI, etc.), 2) Chinese monetary policy and central bank actions, 3) Chinese stock market news (A-shares, Hong Kong stocks), 4) Chinese regulatory changes affecting financial markets, 5) Chinese corporate earnings and major company news, 6) China-US trade relations and international economic relations, 7) Chinese real estate and property market news, 8) Chinese technology sector and policy changes. Make sure you only get the data posted during that period and prioritize Chinese sources and China-focused international coverage.",
+                        }
+                    ],
+                }
+            ],
+            text={"format": {"type": "text"}},
+            reasoning={},
+            tools=[
+                {
+                    "type": "web_search_preview",
+                    "user_location": {"type": "approximate"},
+                    "search_context_size": "high",  # High context for comprehensive coverage
+                }
+            ],
+            temperature=1,
+            max_output_tokens=4096,
+            top_p=1,
+            store=True,
+        )
+
+        return response.output[1].content[0].text
 
 
 def get_fundamentals_openai(ticker, curr_date):
     config = get_config()
-    client = OpenAI(base_url=config["backend_url"])
 
-    response = client.responses.create(
-        model=config["quick_think_llm"],
-        input=[
-            {
-                "role": "system",
-                "content": [
-                    {
-                        "type": "input_text",
-                        "text": f"Can you search Fundamental for discussions on {ticker} during of the month before {curr_date} to the month of {curr_date}. Make sure you only get the data posted during that period. List as a table, with PE/PS/Cash flow/ etc",
-                    }
-                ],
-            }
-        ],
-        text={"format": {"type": "text"}},
-        reasoning={},
-        tools=[
-            {
-                "type": "web_search_preview",
-                "user_location": {"type": "approximate"},
-                "search_context_size": "low",
-            }
-        ],
-        temperature=1,
-        max_output_tokens=4096,
-        top_p=1,
-        store=True,
-    )
+    # Check if using Google provider
+    if config.get("llm_provider", "").lower() == "google":
+        # Configure the Gemini client
+        client = genai.Client()
 
-    return response.output[1].content[0].text
+        # Define the grounding tool for Google Search
+        grounding_tool = types.Tool(
+            google_search=types.GoogleSearch()
+        )
+
+        # Configure generation settings
+        generation_config = types.GenerateContentConfig(
+            tools=[grounding_tool],
+            temperature=1,
+            max_output_tokens=4096,
+            top_p=1,
+        )
+
+        # Make the request
+        response = client.models.generate_content(
+            model=config["quick_think_llm"],
+            contents=f"Can you search Fundamental for discussions on {ticker} during of the month before {curr_date} to the month of {curr_date}. Make sure you only get the data posted during that period. List as a table, with PE/PS/Cash flow/ etc",
+            config=generation_config,
+        )
+
+        return response.text
+    else:
+        # Original OpenAI implementation
+        client = OpenAI(base_url=config["backend_url"])
+
+        response = client.responses.create(
+            model=config["quick_think_llm"],
+            input=[
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": f"Can you search Fundamental for discussions on {ticker} during of the month before {curr_date} to the month of {curr_date}. Make sure you only get the data posted during that period. List as a table, with PE/PS/Cash flow/ etc",
+                        }
+                    ],
+                }
+            ],
+            text={"format": {"type": "text"}},
+            reasoning={},
+            tools=[
+                {
+                    "type": "web_search_preview",
+                    "user_location": {"type": "approximate"},
+                    "search_context_size": "low",
+                }
+            ],
+            temperature=1,
+            max_output_tokens=4096,
+            top_p=1,
+            store=True,
+        )
+
+        return response.output[1].content[0].text
