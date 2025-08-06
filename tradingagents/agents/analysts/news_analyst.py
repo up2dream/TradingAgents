@@ -11,7 +11,14 @@ def create_news_analyst(llm, toolkit):
         tools = [
             toolkit.get_global_news_openai,
             toolkit.get_china_focused_news_openai,
-            toolkit.get_google_news
+            toolkit.get_google_news,
+            toolkit.get_sina_global_financial_news,
+            toolkit.get_eastmoney_financial_breakfast,
+            toolkit.get_eastmoney_global_financial_news,
+            toolkit.get_futu_financial_news,
+            toolkit.get_tonghuashun_global_financial_live,
+            toolkit.get_cailianshe_telegraph,
+            toolkit.get_sina_securities_original
         ]
 
 

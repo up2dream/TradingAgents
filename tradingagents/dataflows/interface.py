@@ -14,6 +14,7 @@ from tqdm import tqdm
 import yfinance as yf
 import tushare as ts
 from openai import OpenAI
+import akshare as ak
 try:
     from google import genai
     from google.genai import types
@@ -1889,3 +1890,247 @@ def get_fundamentals_openai(ticker, curr_date):
         )
 
         return response.output[1].content[0].text
+
+
+def get_sina_global_financial_news() -> str:
+    """
+    获取新浪财经全球财经快讯
+
+    Returns:
+        str: 格式化的全球财经快讯字符串，包含时间和内容
+    """
+    try:
+        # 调用akshare接口获取新浪财经全球财经快讯
+        news_df = ak.stock_info_global_sina()
+
+        if news_df.empty:
+            return "暂无全球财经快讯数据"
+
+        # 格式化输出
+        news_str = "## 新浪财经-全球财经快讯\n\n"
+
+        for index, row in news_df.iterrows():
+            time_str = row['时间']
+            content = row['内容']
+            news_str += f"**{time_str}**\n{content}\n\n"
+
+        return news_str
+
+    except Exception as e:
+        return f"获取新浪财经全球财经快讯时发生错误: {str(e)}"
+
+
+def get_eastmoney_financial_breakfast() -> str:
+    """
+    获取东方财富财经早餐
+
+    Returns:
+        str: 格式化的财经早餐字符串，包含标题、摘要、发布时间和链接
+    """
+    try:
+        # 调用akshare接口获取东方财富财经早餐
+        breakfast_df = ak.stock_info_cjzc_em()
+
+        if breakfast_df.empty:
+            return "暂无财经早餐数据"
+
+        # 格式化输出，只显示最近10条
+        breakfast_str = "## 东方财富-财经早餐\n\n"
+
+        # 取最新的10条数据
+        recent_data = breakfast_df.head(10)
+
+        for index, row in recent_data.iterrows():
+            title = row['标题']
+            summary = row['摘要']
+            publish_time = row['发布时间']
+            link = row['链接']
+
+            breakfast_str += f"### {title}\n"
+            breakfast_str += f"**发布时间**: {publish_time}\n\n"
+            breakfast_str += f"{summary}\n\n"
+            breakfast_str += f"[查看详情]({link})\n\n"
+            breakfast_str += "---\n\n"
+
+        return breakfast_str
+
+    except Exception as e:
+        return f"获取东方财富财经早餐时发生错误: {str(e)}"
+
+
+def get_eastmoney_global_financial_news() -> str:
+    """
+    获取东方财富全球财经快讯
+
+    Returns:
+        str: 格式化的全球财经快讯字符串，包含标题、摘要、发布时间和链接
+    """
+    try:
+        # 调用akshare接口获取东方财富全球财经快讯
+        news_df = ak.stock_info_global_em()
+
+        if news_df.empty:
+            return "暂无东方财富全球财经快讯数据"
+
+        # 格式化输出，显示最新15条
+        news_str = "## 东方财富-全球财经快讯\n\n"
+
+        # 取最新的15条数据
+        recent_data = news_df.head(15)
+
+        for index, row in recent_data.iterrows():
+            title = row['标题']
+            summary = row['摘要']
+            publish_time = row['发布时间']
+            link = row['链接']
+
+            news_str += f"### {title}\n"
+            news_str += f"**发布时间**: {publish_time}\n\n"
+            news_str += f"{summary}\n\n"
+            news_str += f"[查看详情]({link})\n\n"
+            news_str += "---\n\n"
+
+        return news_str
+
+    except Exception as e:
+        return f"获取东方财富全球财经快讯时发生错误: {str(e)}"
+
+
+def get_futu_financial_news() -> str:
+    """
+    获取富途牛牛快讯
+
+    Returns:
+        str: 格式化的富途牛牛快讯字符串，包含标题、内容、发布时间和链接
+    """
+    try:
+        # 调用akshare接口获取富途牛牛快讯
+        news_df = ak.stock_info_global_futu()
+
+        if news_df.empty:
+            return "暂无富途牛牛快讯数据"
+
+        # 格式化输出，显示最新15条
+        news_str = "## 富途牛牛-快讯\n\n"
+
+        # 取最新的15条数据
+        recent_data = news_df.head(15)
+
+        for index, row in recent_data.iterrows():
+            title = row['标题']
+            content = row['内容']
+            publish_time = row['发布时间']
+            link = row['链接']
+
+            news_str += f"### {title}\n"
+            news_str += f"**发布时间**: {publish_time}\n\n"
+            news_str += f"{content}\n\n"
+            news_str += f"[查看详情]({link})\n\n"
+            news_str += "---\n\n"
+
+        return news_str
+
+    except Exception as e:
+        return f"获取富途牛牛快讯时发生错误: {str(e)}"
+
+
+def get_tonghuashun_global_financial_live() -> str:
+    """
+    获取同花顺全球财经直播
+
+    Returns:
+        str: 格式化的同花顺全球财经直播字符串，包含标题、内容、发布时间和链接
+    """
+    try:
+        # 调用akshare接口获取同花顺全球财经直播
+        news_df = ak.stock_info_global_ths()
+
+        if news_df.empty:
+            return "暂无同花顺全球财经直播数据"
+
+        # 格式化输出，显示所有数据（通常20条）
+        news_str = "## 同花顺财经-全球财经直播\n\n"
+
+        for index, row in news_df.iterrows():
+            title = row['标题']
+            content = row['内容']
+            publish_time = row['发布时间']
+            link = row['链接']
+
+            news_str += f"### {title}\n"
+            news_str += f"**发布时间**: {publish_time}\n\n"
+            news_str += f"{content}\n\n"
+            news_str += f"[查看详情]({link})\n\n"
+            news_str += "---\n\n"
+
+        return news_str
+
+    except Exception as e:
+        return f"获取同花顺全球财经直播时发生错误: {str(e)}"
+
+
+def get_cailianshe_telegraph() -> str:
+    """
+    获取财联社电报
+
+    Returns:
+        str: 格式化的财联社电报字符串，包含标题、内容、发布日期和发布时间
+    """
+    try:
+        # 调用akshare接口获取财联社电报（获取全部）
+        news_df = ak.stock_info_global_cls(symbol='全部')
+
+        if news_df.empty:
+            return "暂无财联社电报数据"
+
+        # 格式化输出，显示所有数据（通常20条）
+        news_str = "## 财联社-电报\n\n"
+
+        for index, row in news_df.iterrows():
+            title = row['标题']
+            content = row['内容']
+            publish_date = row['发布日期']
+            publish_time = row['发布时间']
+
+            news_str += f"### {title}\n"
+            news_str += f"**发布时间**: {publish_date} {publish_time}\n\n"
+            news_str += f"{content}\n\n"
+            news_str += "---\n\n"
+
+        return news_str
+
+    except Exception as e:
+        return f"获取财联社电报时发生错误: {str(e)}"
+
+
+def get_sina_securities_original() -> str:
+    """
+    获取新浪财经证券原创
+
+    Returns:
+        str: 格式化的新浪财经证券原创字符串，包含时间、内容和链接
+    """
+    try:
+        # 调用akshare接口获取新浪财经证券原创（第1页）
+        news_df = ak.stock_info_broker_sina(page='1')
+
+        if news_df.empty:
+            return "暂无新浪财经证券原创数据"
+
+        # 格式化输出，显示所有数据
+        news_str = "## 新浪财经-证券原创\n\n"
+
+        for index, row in news_df.iterrows():
+            time = row['时间']
+            content = row['内容']
+            link = row['链接']
+
+            news_str += f"### {content}\n"
+            news_str += f"**发布时间**: {time}\n\n"
+            news_str += f"[查看详情]({link})\n\n"
+            news_str += "---\n\n"
+
+        return news_str
+
+    except Exception as e:
+        return f"获取新浪财经证券原创时发生错误: {str(e)}"

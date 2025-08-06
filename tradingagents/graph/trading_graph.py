@@ -137,10 +137,18 @@ class TradingAgentsGraph:
             ),
             "news": ToolNode(
                 [
-                    # online tools
+                    # online tools - OpenAI/Google based
                     self.toolkit.get_global_news_openai,
                     self.toolkit.get_china_focused_news_openai,
                     self.toolkit.get_google_news,
+                    # online tools - AKSHARE based financial news
+                    self.toolkit.get_sina_global_financial_news,
+                    self.toolkit.get_eastmoney_financial_breakfast,
+                    self.toolkit.get_eastmoney_global_financial_news,
+                    self.toolkit.get_futu_financial_news,
+                    self.toolkit.get_tonghuashun_global_financial_live,
+                    self.toolkit.get_cailianshe_telegraph,
+                    self.toolkit.get_sina_securities_original,
                 ]
             ),
             "fundamentals": ToolNode(
