@@ -15,6 +15,7 @@ from .interface import (
     get_simfin_balance_sheet,
     get_simfin_cashflow,
     get_simfin_income_statements,
+    get_fundamentals_tushare,
     # Technical analysis functions
     get_stock_stats_indicators_window,
     get_stockstats_indicator,
@@ -34,6 +35,7 @@ __all__ = [
     "get_simfin_balance_sheet",
     "get_simfin_cashflow",
     "get_simfin_income_statements",
+    "get_fundamentals_tushare",
     # Technical analysis functions
     "get_stock_stats_indicators_window",
     "get_stockstats_indicator",

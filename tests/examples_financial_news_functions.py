@@ -31,7 +31,7 @@ from tradingagents.dataflows.interface import (
     get_tonghuashun_global_financial_live,
     get_cailianshe_telegraph,
     get_sina_securities_original, get_stock_news_openai, get_global_news_openai, get_china_focused_news_openai,
-    get_google_news
+    get_google_news, get_fundamentals_tushare
 )
 from tradingagents.agents.utils.agent_utils import Toolkit
 
@@ -127,4 +127,8 @@ def test_get_google_news():
 
 def test_get_sina_global_financial_news():
     result = get_eastmoney_global_financial_news("2025-08-06")
+    print(result)
+
+def test_get_fundamentals_tushare():
+    result = get_fundamentals_tushare("688111", "2025-08-06")
     print(result)
