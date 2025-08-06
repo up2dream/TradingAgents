@@ -1,7 +1,6 @@
 from .finnhub_utils import get_data_in_range
 from .googlenews_utils import getNewsData
 from .yfin_utils import YFinanceUtils
-from .reddit_utils import fetch_top_from_category
 from .stockstats_utils import StockstatsUtils
 from .yfin_utils import YFinanceUtils
 from .tushare_utils import TushareUtils, get_tushare_utils
@@ -11,7 +10,6 @@ from .interface import (
     get_finnhub_company_insider_sentiment,
     get_finnhub_company_insider_transactions,
     get_google_news,
-    get_reddit_company_news,
     get_china_focused_news_openai,
     get_china_social_media_openai,
     get_china_social_media_real_data,
@@ -35,7 +33,6 @@ __all__ = [
     "get_finnhub_company_insider_sentiment",
     "get_finnhub_company_insider_transactions",
     "get_google_news",
-    "get_reddit_company_news",
     "get_china_focused_news_openai",
     "get_china_social_media_openai",
     "get_china_social_media_real_data",

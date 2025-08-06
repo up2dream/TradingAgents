@@ -48,27 +48,7 @@ class Toolkit:
         if config:
             self.update_config(config)
 
-    @staticmethod
-    @tool
-    def get_reddit_stock_info(
-        ticker: Annotated[
-            str,
-            "Ticker of a company. e.g. AAPL, TSM",
-        ],
-        curr_date: Annotated[str, "Current date you want to get news for"],
-    ) -> str:
-        """
-        Retrieve the latest news about a given stock from Reddit, given the current date.
-        Args:
-            ticker (str): Ticker of a company. e.g. AAPL, TSM
-            curr_date (str): current date in yyyy-mm-dd format to get news for
-        Returns:
-            str: A formatted dataframe containing the latest news about the company on the given date
-        """
 
-        stock_news_results = interface.get_reddit_company_news(ticker, curr_date, 7, 5)
-
-        return stock_news_results
 
     @staticmethod
     @tool

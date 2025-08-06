@@ -131,8 +131,6 @@ class TradingAgentsGraph:
                     self.toolkit.get_china_social_media_real_data,
                     self.toolkit.get_china_forum_data,
                     self.toolkit.get_china_comprehensive_social_media_data,
-                    # offline tools
-                    self.toolkit.get_reddit_stock_info,
                 ]
             ),
             "news": ToolNode(
