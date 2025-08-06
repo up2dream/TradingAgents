@@ -848,6 +848,70 @@ def get_stock_news_openai(
 
     except Exception as e:
         return f"获取股票新闻时发生错误: {str(e)}"
+
+def get_global_news_openai(curr_date):
+    config = get_config()
+
+    # Check if using Google provider
+    if config.get("llm_provider", "").lower() == "google":
+        # Configure the Gemini client
+        client = genai.Client()
+
+        # Define the grounding tool for Google Search
+        grounding_tool = types.Tool(
+            google_search=types.GoogleSearch()
+        )
+
+        # Configure generation settings
+        generation_config = types.GenerateContentConfig(
+            tools=[grounding_tool],
+            temperature=1,
+            max_output_tokens=4096,
+            top_p=1,
+        )
+
+        # Make the request
+        response = client.models.generate_content(
+            model=config["quick_think_llm"],
+            contents=f"Can you search global or macroeconomics news from 7 days before {curr_date} to {curr_date} that would be informative for trading purposes? Please prioritize and include more Chinese economic news, Chinese market news, Chinese policy news, and China-related international trade news. Also include other major global economic news from US, Europe, and other regions. Make sure you only get the data posted during that period. Focus on: 1) Chinese economic indicators and policies (40% weight), 2) Chinese stock market and financial sector news (30% weight), 3) Global economic news affecting China (20% weight), 4) Other major global economic news (10% weight).",
+            config=generation_config,
+        )
+
+        return response.text
+    else:
+        # Original OpenAI implementation
+        client = OpenAI(base_url=config["backend_url"])
+
+        response = client.responses.create(
+            model=config["quick_think_llm"],
+            input=[
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": f"Can you search global or macroeconomics news from 7 days before {curr_date} to {curr_date} that would be informative for trading purposes? Please prioritize and include more Chinese economic news, Chinese market news, Chinese policy news, and China-related international trade news. Also include other major global economic news from US, Europe, and other regions. Make sure you only get the data posted during that period. Focus on: 1) Chinese economic indicators and policies (40% weight), 2) Chinese stock market and financial sector news (30% weight), 3) Global economic news affecting China (20% weight), 4) Other major global economic news (10% weight).",
+                        }
+                    ],
+                }
+            ],
+            text={"format": {"type": "text"}},
+            reasoning={},
+            tools=[
+                {
+                    "type": "web_search_preview",
+                    "user_location": {"type": "approximate"},
+                    "search_context_size": "medium",  # Increased context size for better coverage
+                }
+            ],
+            temperature=1,
+            max_output_tokens=4096,
+            top_p=1,
+            store=True,
+        )
+
+        return response.output[1].content[0].text
+
 def get_china_focused_news_openai(curr_date):
     """
     Get China-focused economic and market news using OpenAI API or Google Gemini API
