@@ -657,8 +657,8 @@ def get_stock_news_openai(
     max_limit_per_day: Annotated[int, "Maximum number of news per day"]
 ):
     """
-    获取股票新闻数据，使用AKSHARE的stock_news_em接口
-    Get stock news data using AKSHARE's stock_news_em interface
+    获取股票新闻数据，使用AKSHARE的stock_news_em接口，并获取新闻链接的内容
+    Get stock news data using AKSHARE's stock_news_em interface and fetch content from news links
 
     Args:
         ticker (str): 股票代码 / ticker symbol of the company
@@ -669,6 +669,56 @@ def get_stock_news_openai(
     Returns:
         str: 格式化的新闻报告 / formatted news report
     """
+
+    def fetch_news_content(url):
+        """
+        获取新闻链接的内容
+        Fetch content from news URL
+        """
+        try:
+            import requests
+            from bs4 import BeautifulSoup
+            import time
+
+            # 添加请求头，模拟浏览器访问
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'zh-CN,zh;q=0.8,en-US;q=0.5,en;q=0.3',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            }
+
+            # 设置超时时间
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            response.encoding = response.apparent_encoding
+
+            # 使用BeautifulSoup解析HTML
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # 移除脚本和样式元素
+            for script in soup(["script", "style"]):
+                script.decompose()
+
+            # 获取文本内容
+            text = soup.get_text()
+
+            # 清理文本
+            lines = (line.strip() for line in text.splitlines())
+            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+            text = ' '.join(chunk for chunk in chunks if chunk)
+
+            # 限制内容长度
+            if len(text) > 1000:
+                text = text[:1000] + "..."
+
+            return text
+
+        except Exception as e:
+            return f"获取链接内容失败: {str(e)}"
+
     try:
         # 检查AKSHARE是否可用
         if not AKSHARE_AVAILABLE:
@@ -693,6 +743,7 @@ def get_stock_news_openai(
         title_column = '新闻标题'
         content_column = '新闻内容'
         source_column = '文章来源'
+        link_column = '新闻链接'
 
         # 检查必要的列是否存在
         if date_column not in news_df.columns:
@@ -720,11 +771,22 @@ def get_stock_news_openai(
                         daily_news_count[date_key] = 0
 
                     if daily_news_count[date_key] < max_limit_per_day:
+                        # 获取新闻链接内容
+                        link_content = ""
+                        news_link = ""
+                        if link_column in news_df.columns and pd.notna(row[link_column]):
+                            news_link = str(row[link_column])
+                            if news_link and news_link != "":
+                                print(f"正在获取新闻链接内容: {news_link}")
+                                link_content = fetch_news_content(news_link)
+
                         news_item = {
                             'date': news_date.strftime("%Y-%m-%d %H:%M:%S"),
                             'title': str(row[title_column]),
                             'content': str(row[content_column]) if content_column in news_df.columns else "",
-                            'source': str(row[source_column]) if source_column in news_df.columns else ""
+                            'source': str(row[source_column]) if source_column in news_df.columns else "",
+                            'link': news_link,
+                            'link_content': link_content
                         }
                         filtered_news.append(news_item)
                         daily_news_count[date_key] += 1
@@ -760,12 +822,25 @@ def get_stock_news_openai(
             report += f"**{news['date'][11:]}** - {news['title']}\n"
             if news['source']:
                 report += f"*来源: {news['source']}*\n"
+
+            # 显示原始新闻内容
             if news['content'] and news['content'] != "":
                 # 限制内容长度
                 content = news['content'][:200] + "..." if len(news['content']) > 200 else news['content']
-                report += f"{content}\n\n"
-            else:
-                report += "\n"
+                report += f"**摘要**: {content}\n\n"
+
+            # 显示新闻链接
+            if news['link']:
+                report += f"**新闻链接**: {news['link']}\n\n"
+
+            # 显示链接内容
+            if news['link_content'] and news['link_content'] != "":
+                if not news['link_content'].startswith("获取链接内容失败"):
+                    report += f"**链接内容**:\n{news['link_content']}\n\n"
+                else:
+                    report += f"*{news['link_content']}*\n\n"
+
+            report += "---\n\n"
 
         report += f"\n---\n*数据来源: AKShare stock_news_em*"
 
