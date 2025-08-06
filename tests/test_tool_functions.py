@@ -14,7 +14,7 @@ dotenv_path = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 if dotenv_path.exists():
     load_dotenv(dotenv_path=dotenv_path)
 
-from tradingagents.dataflows.interface import get_china_focused_news_openai, get_global_news_openai
+from tradingagents.dataflows.interface import get_china_focused_news_openai, get_global_news_openai, get_google_news
 from tradingagents.dataflows.config import get_config, set_config
 
 class TestChinaFocusedNews(unittest.TestCase):
@@ -94,6 +94,34 @@ class TestChinaFocusedNews(unittest.TestCase):
                 self.skipTest(f"Invalid Google API key: {str(e)}")
             else:
                 self.fail(f"Google Gemini test failed with error: {str(e)}")
+                
+    def test_get_google_news(self):
+        """Test the get_google_news function for retrieving news from Google."""
+        custom_config = self.original_config.copy()
+        # Set the provider to Google to test the Google Gemini path
+        set_config(custom_config)
+        
+        try:
+            # Call the function with actual API
+            test_date = "2025-08-06"
+            query = "global finance news"
+            look_back_days = 7
+            result = get_google_news(query, test_date, look_back_days)
+            
+            # Verify the result is not empty
+            self.assertIsNotNone(result)
+            self.assertIsInstance(result, str)
+            self.assertGreater(len(result), 0)
+            
+            # Print the result for display
+            print(f"\nGoogle News Result for '{query}' (from {test_date} looking back {look_back_days} days): {result}...")
+        except Exception as e:
+            # Skip test if API key is invalid
+            if "invalid_api_key" in str(e) or "AuthenticationError" in str(e) or "API key not valid" in str(e):
+                print(f"\nSkipping Google News test: Invalid API key")
+                self.skipTest(f"Invalid Google API key: {str(e)}")
+            else:
+                self.fail(f"Google News test failed with error: {str(e)}")
 
 if __name__ == "__main__":
     unittest.main()
