@@ -65,7 +65,9 @@ def example_sina_global_financial_news():
     print("AKSHARE接口: ak.stock_info_global_sina()")
     
     try:
-        result = get_sina_global_financial_news()
+        # 使用当前日期作为测试
+        curr_date = datetime.now().strftime("%Y-%m-%d")
+        result = get_sina_global_financial_news(curr_date)
         print(f"\n返回数据长度: {len(result)} 字符")
         print(f"数据类型: {type(result)}")
         print("\n输出内容预览:")
@@ -85,7 +87,9 @@ def example_eastmoney_financial_breakfast():
     print("AKSHARE接口: ak.stock_info_cjzc_em()")
     
     try:
-        result = get_eastmoney_financial_breakfast()
+        # 使用当前日期作为测试
+        curr_date = datetime.now().strftime("%Y-%m-%d")
+        result = get_eastmoney_financial_breakfast(curr_date)
         print(f"\n返回数据长度: {len(result)} 字符")
         print(f"数据类型: {type(result)}")
         print("\n输出内容预览:")
@@ -122,5 +126,5 @@ def test_get_google_news():
         pass
 
 def test_get_sina_global_financial_news():
-    result = get_sina_securities_original("2025-08-06")
+    result = get_eastmoney_global_financial_news("2025-08-06")
     print(result)

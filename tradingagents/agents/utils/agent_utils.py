@@ -374,98 +374,133 @@ class Toolkit:
 
     @staticmethod
     @tool
-    def get_sina_global_financial_news():
+    def get_sina_global_financial_news(
+        curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]
+    ):
         """
         获取新浪财经全球财经快讯数据
+
+        Args:
+            curr_date (str): current date you are trading at, yyyy-mm-dd
 
         Returns:
             str: 格式化的全球财经快讯字符串，包含最新的财经新闻和时间信息
         """
 
-        result = interface.get_sina_global_financial_news()
+        result = interface.get_sina_global_financial_news(curr_date)
 
         return result
 
     @staticmethod
     @tool
-    def get_eastmoney_financial_breakfast():
+    def get_eastmoney_financial_breakfast(
+        curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]
+    ):
         """
         获取东方财富财经早餐数据
+
+        Args:
+            curr_date (str): current date you are trading at, yyyy-mm-dd
 
         Returns:
             str: 格式化的财经早餐字符串，包含最新的财经早餐内容、标题、摘要、发布时间和链接
         """
 
-        result = interface.get_eastmoney_financial_breakfast()
+        result = interface.get_eastmoney_financial_breakfast(curr_date)
 
         return result
 
     @staticmethod
     @tool
-    def get_eastmoney_global_financial_news():
+    def get_eastmoney_global_financial_news(
+        curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]
+    ):
         """
         获取东方财富全球财经快讯数据
+
+        Args:
+            curr_date (str): current date you are trading at, yyyy-mm-dd
 
         Returns:
             str: 格式化的全球财经快讯字符串，包含最新的财经新闻标题、摘要、发布时间和链接
         """
 
-        result = interface.get_eastmoney_global_financial_news()
+        result = interface.get_eastmoney_global_financial_news(curr_date)
 
         return result
 
     @staticmethod
     @tool
-    def get_futu_financial_news():
+    def get_futu_financial_news(
+        curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]
+    ):
         """
         获取富途牛牛快讯数据
+
+        Args:
+            curr_date (str): current date you are trading at, yyyy-mm-dd
 
         Returns:
             str: 格式化的富途牛牛快讯字符串，包含最新的财经快讯标题、内容、发布时间和链接
         """
 
-        result = interface.get_futu_financial_news()
+        result = interface.get_futu_financial_news(curr_date)
 
         return result
 
     @staticmethod
     @tool
-    def get_tonghuashun_global_financial_live():
+    def get_tonghuashun_global_financial_live(
+        curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]
+    ):
         """
         获取同花顺全球财经直播数据
+
+        Args:
+            curr_date (str): current date you are trading at, yyyy-mm-dd
 
         Returns:
             str: 格式化的同花顺全球财经直播字符串，包含最新的财经直播标题、内容、发布时间和链接
         """
 
-        result = interface.get_tonghuashun_global_financial_live()
+        result = interface.get_tonghuashun_global_financial_live(curr_date)
 
         return result
 
     @staticmethod
     @tool
-    def get_cailianshe_telegraph():
+    def get_cailianshe_telegraph(
+        curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]
+    ):
         """
         获取财联社电报数据
+
+        Args:
+            curr_date (str): current date you are trading at, yyyy-mm-dd
 
         Returns:
             str: 格式化的财联社电报字符串，包含最新的财经电报标题、内容、发布日期和时间
         """
 
-        result = interface.get_cailianshe_telegraph()
+        result = interface.get_cailianshe_telegraph(curr_date)
 
         return result
 
     @staticmethod
     @tool
-    def get_sina_securities_original():
+    def get_sina_securities_original(
+        curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]
+    ):
         """
         获取新浪财经证券原创数据
+
+        Args:
+            curr_date (str): current date you are trading at, yyyy-mm-dd
 
         Returns:
             str: 格式化的新浪财经证券原创字符串，包含最新的证券原创文章时间、内容和链接
         """
 
-        result = interface.get_sina_securities_original()
+        result = interface.get_sina_securities_original(curr_date)
 
         return result
