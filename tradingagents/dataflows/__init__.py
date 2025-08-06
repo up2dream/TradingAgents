@@ -7,14 +7,9 @@ from .tushare_utils import TushareUtils, get_tushare_utils
 
 from .interface import (
     # News and sentiment functions
-    get_finnhub_company_insider_sentiment,
-    get_finnhub_company_insider_transactions,
     get_google_news,
     get_china_focused_news_openai,
     # Financial statements functions
-    get_simfin_balance_sheet,
-    get_simfin_cashflow,
-    get_simfin_income_statements,
     get_fundamentals_tushare,
     # Technical analysis functions
     get_stock_stats_indicators_window,
@@ -27,14 +22,9 @@ from .interface import (
 
 __all__ = [
     # News and sentiment functions
-    "get_finnhub_company_insider_sentiment",
-    "get_finnhub_company_insider_transactions",
     "get_google_news",
     "get_china_focused_news_openai",
     # Financial statements functions
-    "get_simfin_balance_sheet",
-    "get_simfin_cashflow",
-    "get_simfin_income_statements",
     "get_fundamentals_tushare",
     # Technical analysis functions
     "get_stock_stats_indicators_window",
