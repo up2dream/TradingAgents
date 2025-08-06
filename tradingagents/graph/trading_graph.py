@@ -126,11 +126,6 @@ class TradingAgentsGraph:
                 [
                     # online tools
                     self.toolkit.get_stock_news_openai,
-                    self.toolkit.get_china_social_media_openai,
-                    # real data tools (work both online and offline)
-                    self.toolkit.get_china_social_media_real_data,
-                    self.toolkit.get_china_forum_data,
-                    self.toolkit.get_china_comprehensive_social_media_data,
                 ]
             ),
             "news": ToolNode(

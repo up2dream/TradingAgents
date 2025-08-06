@@ -296,18 +296,22 @@ class Toolkit:
     @tool
     def get_stock_news_openai(
         ticker: Annotated[str, "the company's ticker"],
-        curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
+        start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
+        look_back_days: Annotated[int, "how many days to look back"] = 7,
+        max_limit_per_day: Annotated[int, "Maximum number of news per day"] = 3,
     ):
         """
-        Retrieve the latest news about a given stock by using OpenAI's news API.
+        Retrieve the latest news about a given stock using AKSHARE's stock_news_em interface.
         Args:
-            ticker (str): Ticker of a company. e.g. AAPL, TSM
-            curr_date (str): Current date in yyyy-mm-dd format
+            ticker (str): Ticker of a company. e.g. AAPL, TSM, 000001
+            start_date (str): Start date in yyyy-mm-dd format
+            look_back_days (int): how many days to look back (default: 7)
+            max_limit_per_day (int): Maximum number of news per day (default: 3)
         Returns:
-            str: A formatted string containing the latest news about the company on the given date.
+            str: A formatted string containing the latest news about the company.
         """
 
-        openai_news_results = interface.get_stock_news_openai(ticker, curr_date)
+        openai_news_results = interface.get_stock_news_openai(ticker, start_date, look_back_days, max_limit_per_day)
 
         return openai_news_results
 
@@ -346,116 +350,6 @@ class Toolkit:
         china_news_results = interface.get_china_focused_news_openai(curr_date)
 
         return china_news_results
-
-    @staticmethod
-    @tool
-    def get_china_social_media_openai(
-        ticker: Annotated[str, "Stock ticker symbol"],
-        curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
-    ):
-        """
-        专门搜索中国社交媒体平台上关于特定股票的讨论和分析。
-        Specifically search Chinese social media platforms (Weibo, Xueqiu, Zhihu, etc.) for stock discussions.
-
-        This function focuses on Chinese social media platforms including:
-        - Weibo (微博) - for general social media sentiment
-        - Xueqiu (雪球) - for professional investment discussions
-        - Zhihu (知乎) - for in-depth analysis and Q&A
-        - Eastmoney Guba (东方财富股吧) - for retail investor sentiment
-        - Tonghuashun (同花顺) - for technical analysis discussions
-
-        Args:
-            ticker (str): Stock ticker symbol (e.g., '000001', '600000')
-            curr_date (str): Current date in yyyy-mm-dd format
-        Returns:
-            str: Comprehensive analysis of Chinese social media sentiment and discussions about the stock.
-        """
-
-        china_social_results = interface.get_china_social_media_openai(ticker, curr_date)
-
-        return china_social_results
-
-    @staticmethod
-    @tool
-    def get_china_social_media_real_data(
-        ticker: Annotated[str, "Stock ticker symbol"],
-        curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
-    ):
-        """
-        获取真实的中国社交媒体数据，使用 AKShare 等本地库直接获取数据。
-        Get real Chinese social media data using AKShare and other local libraries for direct data access.
-
-        This function provides REAL data from Chinese social media platforms including:
-        - Xueqiu (雪球) - Real attention, discussion, and trading rankings
-        - Eastmoney (东方财富) - Real popularity and trending rankings
-        - Individual stock heat trends - Real heat trend data
-        - Interactive platforms - Real investor interaction data
-
-        Unlike the LLM-based search, this function returns actual structured data from APIs.
-
-        Args:
-            ticker (str): Stock ticker symbol (e.g., '000001', '600000')
-            curr_date (str): Current date in yyyy-mm-dd format
-        Returns:
-            str: Comprehensive report with real Chinese social media data and analysis.
-        """
-
-        real_social_results = interface.get_china_social_media_real_data(ticker, curr_date)
-
-        return real_social_results
-
-    @staticmethod
-    @tool
-    def get_china_forum_data(
-        ticker: Annotated[str, "Stock ticker symbol"],
-        curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
-    ):
-        """
-        获取中国主流投资论坛数据，包括东方财富股吧、雪球、同花顺等平台。
-        Get data from mainstream Chinese investment forums including Eastmoney Guba, Xueqiu, Tonghuashun, etc.
-
-        This function provides data from major Chinese investment forums:
-        - Eastmoney Guba (东方财富股吧) - Popular retail investor discussions
-        - Xueqiu (雪球) - Professional investment community
-        - Tonghuashun (同花顺) - Concept and industry discussions
-
-        Args:
-            ticker (str): Stock ticker symbol (e.g., '000001', '688111')
-            curr_date (str): Current date in yyyy-mm-dd format
-        Returns:
-            str: Comprehensive report with mainstream forum data and sentiment analysis.
-        """
-
-        forum_results = interface.get_china_forum_data(ticker, curr_date)
-
-        return forum_results
-
-    @staticmethod
-    @tool
-    def get_china_comprehensive_social_media_data(
-        ticker: Annotated[str, "Stock ticker symbol"],
-        curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
-    ):
-        """
-        获取综合的中国社交媒体数据，整合所有数据源包括基础数据和主流论坛。
-        Get comprehensive Chinese social media data integrating all sources including basic data and mainstream forums.
-
-        This function provides the most complete Chinese social media analysis by combining:
-        - Basic social media data (AKShare + Tushare)
-        - Mainstream forum data (Eastmoney, Xueqiu, Tonghuashun)
-        - Interactive platform data
-        - News and sentiment analysis
-
-        Args:
-            ticker (str): Stock ticker symbol (e.g., '000001', '688111')
-            curr_date (str): Current date in yyyy-mm-dd format
-        Returns:
-            str: Comprehensive integrated report with all Chinese social media data sources.
-        """
-
-        comprehensive_results = interface.get_china_comprehensive_social_media_data(ticker, curr_date)
-
-        return comprehensive_results
 
     @staticmethod
     @tool

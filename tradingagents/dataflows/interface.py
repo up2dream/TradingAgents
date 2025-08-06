@@ -5,7 +5,7 @@ from .googlenews_utils import *
 from .finnhub_utils import get_data_in_range
 from dateutil.relativedelta import relativedelta
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import os
 import pandas as pd
@@ -650,1039 +650,129 @@ def get_YFin_data(
     return filtered_data
 
 
-def get_stock_news_openai(ticker, curr_date):
-    config = get_config()
+def get_stock_news_openai(
+    ticker: Annotated[str, "ticker symbol of the company"],
+    start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
+    look_back_days: Annotated[int, "how many days to look back"],
+    max_limit_per_day: Annotated[int, "Maximum number of news per day"]
+):
+    """
+    获取股票新闻数据，使用AKSHARE的stock_news_em接口
+    Get stock news data using AKSHARE's stock_news_em interface
 
-    # Check if this is a Chinese stock
-    from .tushare_utils import get_tushare_utils
+    Args:
+        ticker (str): 股票代码 / ticker symbol of the company
+        start_date (str): 开始日期，格式为yyyy-mm-dd / Start date in yyyy-mm-dd format
+        look_back_days (int): 向前查看的天数 / how many days to look back
+        max_limit_per_day (int): 每天最大新闻数量 / Maximum number of news per day
+
+    Returns:
+        str: 格式化的新闻报告 / formatted news report
+    """
     try:
-        tushare_utils = get_tushare_utils()
-        is_chinese_stock = tushare_utils.is_chinese_stock(ticker)
-    except:
-        is_chinese_stock = False
+        # 检查AKSHARE是否可用
+        if not AKSHARE_AVAILABLE:
+            return "AKShare 未安装，无法获取股票新闻数据"
 
-    # Check if using Google provider
-    if config.get("llm_provider", "").lower() == "google":
-        try:
-            if GOOGLE_GENAI_AVAILABLE:
-                # Use new google.genai API
-                client = genai.Client()
-                grounding_tool = types.Tool(google_search=types.GoogleSearch())
-                generation_config = types.GenerateContentConfig(
-                    tools=[grounding_tool],
-                    temperature=1,
-                    max_output_tokens=4096,
-                    top_p=1,
-                )
-            else:
-                # Use fallback google.generativeai API
-                import google.generativeai as genai_fallback
-                genai_fallback.configure(api_key=os.getenv('GOOGLE_API_KEY'))
-                model = genai_fallback.GenerativeModel('gemini-1.5-flash')
+        # 计算日期范围
+        end_date = datetime.strptime(start_date, "%Y-%m-%d")
+        start_date_obj = end_date - timedelta(days=look_back_days)
 
-            # Create enhanced search query for Chinese stocks
-            if is_chinese_stock:
-                # Get company name if possible
-                try:
-                    company_info = tushare_utils.get_stock_basic_info(ticker)
-                    company_name = company_info.get('name', ticker)
-                except:
-                    company_name = ticker
+        # 使用AKSHARE获取股票新闻
+        news_df = ak.stock_news_em(symbol=ticker)
 
-                search_query = f"""请搜索关于股票代码 {ticker} ({company_name}) 在 {curr_date} 前7天到 {curr_date} 期间的中国社交媒体讨论。
+        if news_df.empty:
+            return f"未找到股票 {ticker} 的新闻数据"
 
-请重点搜索以下平台的相关内容：
-1. 微博 (weibo.com) - 搜索 "{ticker}" "{company_name}" 相关讨论
-2. 雪球 (xueqiu.com) - 搜索股票讨论和分析
-3. 知乎 (zhihu.com) - 搜索相关问答和分析
-4. 东方财富股吧 (guba.eastmoney.com) - 搜索股票讨论
-5. 同花顺 (10jqka.com.cn) - 搜索股票资讯和讨论
+        # 过滤日期范围内的新闻
+        filtered_news = []
 
-请确保只获取指定时间段内发布的内容，并总结投资者情绪和主要观点。"""
-            else:
-                search_query = f"""Search for social media discussions about stock ticker {ticker} from 7 days before {curr_date} to {curr_date}.
+        # AKSHARE stock_news_em 返回的列名是固定的中文列名
+        # ['关键词', '新闻标题', '新闻内容', '发布时间', '文章来源', '新闻链接']
+        date_column = '发布时间'
+        title_column = '新闻标题'
+        content_column = '新闻内容'
+        source_column = '文章来源'
 
-Focus on these platforms:
-1. Twitter/X - search for "${ticker}" discussions
-2. Reddit - search r/investing, r/stocks, r/SecurityAnalysis for {ticker}
-3. StockTwits - search for {ticker} sentiment
-4. Yahoo Finance comments
-5. Seeking Alpha comments
+        # 检查必要的列是否存在
+        if date_column not in news_df.columns:
+            return f"数据格式错误：未找到'{date_column}'列。实际列名：{list(news_df.columns)}"
+        if title_column not in news_df.columns:
+            return f"数据格式错误：未找到'{title_column}'列。实际列名：{list(news_df.columns)}"
 
-Make sure you only get data posted during the specified time period and summarize investor sentiment and key points."""
+        # 处理新闻数据
+        daily_news_count = {}
 
-            # Make the request
-            if GOOGLE_GENAI_AVAILABLE:
-                response = client.models.generate_content(
-                    model=config["quick_think_llm"],
-                    contents=search_query,
-                    config=generation_config,
-                )
-                return response.text
-            else:
-                # Use fallback API without grounding tools
-                response = model.generate_content(search_query)
-                return response.text
-
-        except Exception as e:
-            print(f"Google API failed: {e}, falling back to OpenAI")
-            # Fall through to OpenAI implementation
-
-    # OpenAI implementation (either as fallback or primary)
-    if config.get("llm_provider", "").lower() != "google" or True:  # Always execute as fallback
-        # Original OpenAI implementation with enhanced query
-        client = OpenAI(base_url=config["backend_url"])
-
-        if is_chinese_stock:
-            # Get company name if possible
+        for idx, row in news_df.iterrows():
             try:
-                company_info = tushare_utils.get_stock_basic_info(ticker)
-                company_name = company_info.get('name', ticker)
-            except:
-                company_name = ticker
+                # 解析日期 - AKSHARE返回的格式是 "YYYY-MM-DD HH:MM:SS"
+                news_date_str = str(row[date_column])
 
-            search_text = f"""请搜索关于股票代码 {ticker} ({company_name}) 在 {curr_date} 前7天到 {curr_date} 期间的中国社交媒体讨论。
+                # 解析日期
+                news_date = datetime.strptime(news_date_str, "%Y-%m-%d %H:%M:%S")
 
-请重点搜索以下平台：微博、雪球、知乎、东方财富股吧、同花顺等平台的相关讨论。
-请确保只获取指定时间段内发布的内容，并总结投资者情绪和主要观点。"""
-        else:
-            search_text = f"Search social media (Twitter, Reddit, StockTwits) for {ticker} from 7 days before {curr_date} to {curr_date}. Focus on investor sentiment and key discussions."
+                # 检查是否在指定日期范围内
+                if start_date_obj <= news_date <= end_date:
+                    date_key = news_date.strftime("%Y-%m-%d")
 
-        response = client.responses.create(
-            model=config["quick_think_llm"],
-            input=[
-                {
-                    "role": "system",
-                    "content": [
-                        {
-                            "type": "input_text",
-                            "text": search_text,
+                    # 检查每日新闻数量限制
+                    if date_key not in daily_news_count:
+                        daily_news_count[date_key] = 0
+
+                    if daily_news_count[date_key] < max_limit_per_day:
+                        news_item = {
+                            'date': news_date.strftime("%Y-%m-%d %H:%M:%S"),
+                            'title': str(row[title_column]),
+                            'content': str(row[content_column]) if content_column in news_df.columns else "",
+                            'source': str(row[source_column]) if source_column in news_df.columns else ""
                         }
-                    ],
-                }
-            ],
-            text={"format": {"type": "text"}},
-            reasoning={},
-            tools=[
-                {
-                    "type": "web_search_preview",
-                    "user_location": {"type": "approximate"},
-                    "search_context_size": "medium",  # Increased for better coverage
-                }
-            ],
-            temperature=1,
-            max_output_tokens=4096,
-            top_p=1,
-            store=True,
-        )
+                        filtered_news.append(news_item)
+                        daily_news_count[date_key] += 1
 
-        return response.output[1].content[0].text
+            except Exception as e:
+                # 如果处理单条新闻出错，继续处理下一条
+                print(f"处理新闻时出错: {e}, 新闻日期: {row[date_column]}")
+                continue
 
+        # 生成报告
+        if not filtered_news:
+            return f"在 {start_date_obj.strftime('%Y-%m-%d')} 到 {end_date.strftime('%Y-%m-%d')} 期间未找到股票 {ticker} 的相关新闻"
 
-def get_china_social_media_openai(ticker, curr_date):
-    """
-    专门搜索中国社交媒体平台上关于特定股票的讨论
-    Specifically search Chinese social media platforms for stock discussions
-    """
-    config = get_config()
+        # 按日期排序
+        filtered_news.sort(key=lambda x: x['date'], reverse=True)
 
-    # Get company information for better search
-    from .tushare_utils import get_tushare_utils
-    try:
-        tushare_utils = get_tushare_utils()
-        company_info = tushare_utils.get_stock_basic_info(ticker)
-        company_name = company_info.get('name', ticker)
-        industry = company_info.get('industry', '')
-    except:
-        company_name = ticker
-        industry = ''
+        # 格式化输出
+        report = f"## 股票 {ticker} 新闻报告\n"
+        report += f"**时间范围**: {start_date_obj.strftime('%Y-%m-%d')} 到 {end_date.strftime('%Y-%m-%d')}\n"
+        report += f"**查找天数**: {look_back_days} 天\n"
+        report += f"**每日新闻限制**: {max_limit_per_day} 条\n"
+        report += f"**总计新闻数量**: {len(filtered_news)} 条\n\n"
 
-    # Check if using Google provider
-    if config.get("llm_provider", "").lower() == "google":
-        try:
-            if GOOGLE_GENAI_AVAILABLE:
-                # Use new google.genai API
-                client = genai.Client()
-                grounding_tool = types.Tool(google_search=types.GoogleSearch())
-                generation_config = types.GenerateContentConfig(
-                    tools=[grounding_tool],
-                    temperature=1,
-                    max_output_tokens=4096,
-                    top_p=1,
-                )
+        # 按日期分组显示新闻
+        current_date = None
+        for news in filtered_news:
+            news_date = news['date'][:10]  # 只取日期部分
+
+            if current_date != news_date:
+                current_date = news_date
+                report += f"### {current_date}\n\n"
+
+            report += f"**{news['date'][11:]}** - {news['title']}\n"
+            if news['source']:
+                report += f"*来源: {news['source']}*\n"
+            if news['content'] and news['content'] != "":
+                # 限制内容长度
+                content = news['content'][:200] + "..." if len(news['content']) > 200 else news['content']
+                report += f"{content}\n\n"
             else:
-                # Use fallback google.generativeai API
-                import google.generativeai as genai_fallback
-                genai_fallback.configure(api_key=os.getenv('GOOGLE_API_KEY'))
-                model = genai_fallback.GenerativeModel('gemini-1.5-flash')
+                report += "\n"
 
-            # Create comprehensive Chinese social media search query
-            search_query = f"""请深度搜索中国社交媒体平台关于股票 {ticker} ({company_name}) 在 {curr_date} 前7天到 {curr_date} 期间的所有相关讨论和分析。
+        report += f"\n---\n*数据来源: AKShare stock_news_em*"
 
-具体搜索策略：
-
-1. 微博 (weibo.com)：
-   - 搜索关键词："{ticker}" "{company_name}" "股票" "投资"
-   - 查找财经博主、分析师、投资者的相关微博
-   - 关注转发量和评论量高的内容
-
-2. 雪球 (xueqiu.com)：
-   - 搜索股票代码 {ticker} 的专门讨论页面
-   - 查找用户发布的分析报告和观点
-   - 关注热门讨论和专业投资者观点
-
-3. 知乎 (zhihu.com)：
-   - 搜索关于 {company_name} 或 {ticker} 的问答
-   - 查找行业分析和投资建议
-   - 关注专业人士的回答
-
-4. 东方财富股吧 (guba.eastmoney.com)：
-   - 搜索 {ticker} 专门的股吧讨论
-   - 查找散户投资者的情绪和观点
-   - 关注热门帖子和讨论
-
-5. 同花顺 (10jqka.com.cn)：
-   - 搜索股票资讯和用户讨论
-   - 查找技术分析和基本面分析
-
-6. 其他平台：
-   - 财联社、证券时报等财经媒体的评论区
-   - 各大财经APP的用户讨论
-
-请分析并总结：
-- 整体投资者情绪（看多/看空/中性）
-- 主要讨论话题和关注点
-- 重要的利好或利空消息
-- 技术分析观点
-- 基本面分析观点
-- 风险提示和担忧
-- 目标价位和投资建议
-
-请确保只获取指定时间段 ({curr_date} 前7天到 {curr_date}) 内发布的内容。"""
-
-            # Make the request
-            if GOOGLE_GENAI_AVAILABLE:
-                response = client.models.generate_content(
-                    model=config["quick_think_llm"],
-                    contents=search_query,
-                    config=generation_config,
-                )
-                return response.text
-            else:
-                # Use fallback API without grounding tools
-                response = model.generate_content(search_query)
-                return response.text
-
-        except Exception as e:
-            print(f"Google API failed: {e}, falling back to OpenAI")
-
-    # OpenAI implementation (either as fallback or primary)
-    if config.get("llm_provider", "").lower() != "google" or True:  # Always execute as fallback
-        # OpenAI implementation
-        client = OpenAI(base_url=config["backend_url"])
-
-        search_text = f"""请深度搜索中国社交媒体平台关于股票 {ticker} ({company_name}) 在 {curr_date} 前7天到 {curr_date} 期间的讨论。
-
-重点搜索：微博、雪球、知乎、东方财富股吧、同花顺等平台。
-分析投资者情绪、主要观点、利好利空消息、技术和基本面分析。
-请确保只获取指定时间段内的内容。"""
-
-        response = client.responses.create(
-            model=config["quick_think_llm"],
-            input=[
-                {
-                    "role": "system",
-                    "content": [
-                        {
-                            "type": "input_text",
-                            "text": search_text,
-                        }
-                    ],
-                }
-            ],
-            text={"format": {"type": "text"}},
-            reasoning={},
-            tools=[
-                {
-                    "type": "web_search_preview",
-                    "user_location": {"type": "approximate"},
-                    "search_context_size": "high",  # High context for comprehensive search
-                }
-            ],
-            temperature=1,
-            max_output_tokens=4096,
-            top_p=1,
-            store=True,
-        )
-
-        return response.output[1].content[0].text
-
-
-def get_china_social_media_real_data(ticker, curr_date):
-    """
-    获取真实的中国社交媒体数据 - 使用 AKShare 等本地库
-    Get real Chinese social media data using AKShare and other local libraries
-    """
-    import pandas as pd
-    from datetime import datetime, timedelta
-
-    results = {}
-
-    try:
-        # 1. 东方财富热度数据 - Eastmoney Hot Data (这个最可靠)
-        try:
-            if AKSHARE_AVAILABLE:
-                # 获取东方财富人气排行榜
-                hot_rank_df = ak.stock_hot_rank_em()
-
-                # 查找目标股票
-                target_hot = hot_rank_df[hot_rank_df['代码'].str.contains(ticker, na=False)] if not hot_rank_df.empty else pd.DataFrame()
-
-                # 获取东方财富飙升榜
-                try:
-                    hot_up_df = ak.stock_hot_up_em()
-                    target_up = hot_up_df[hot_up_df['代码'].str.contains(ticker, na=False)] if not hot_up_df.empty else pd.DataFrame()
-                except:
-                    target_up = pd.DataFrame()
-
-                results['东方财富数据'] = {
-                    '人气排行': target_hot.to_dict('records') if not target_hot.empty else [],
-                    '飙升排行': target_up.to_dict('records') if not target_up.empty else []
-                }
-            else:
-                results['东方财富数据'] = "AKShare 未安装，无法获取东方财富数据"
-
-        except Exception as e:
-            results['东方财富数据'] = f"获取失败: {e}"
-
-        # 2. 个股详细热度数据 - Individual Stock Heat Data
-        try:
-            if AKSHARE_AVAILABLE:
-                # 获取整体热度排行榜，然后查找目标股票
-                hot_rank_df = ak.stock_hot_rank_em()
-                target_hot_rank = hot_rank_df[hot_rank_df['代码'].str.contains(ticker, na=False)] if not hot_rank_df.empty else pd.DataFrame()
-
-                # 尝试获取实时热度数据
-                try:
-                    hot_realtime_df = ak.stock_hot_rank_detail_realtime_em()
-                    target_realtime = hot_realtime_df[hot_realtime_df['代码'].str.contains(ticker, na=False)] if not hot_realtime_df.empty else pd.DataFrame()
-                except:
-                    target_realtime = pd.DataFrame()
-
-                results['个股热度详情'] = {
-                    '热度排行': target_hot_rank.to_dict('records') if not target_hot_rank.empty else [],
-                    '实时热度': target_realtime.to_dict('records') if not target_realtime.empty else []
-                }
-            else:
-                results['个股热度详情'] = "AKShare 未安装，无法获取个股热度数据"
-
-        except Exception as e:
-            results['个股热度详情'] = f"获取失败: {e}"
-
-        # 3. 互动平台数据 - Interactive Platform Data
-        try:
-            if AKSHARE_AVAILABLE:
-                # 尝试获取互动易数据 - 某些股票可能不支持
-                interact_df = pd.DataFrame()
-
-                # 尝试多种股票代码格式
-                symbols_to_try = [ticker]
-
-                # 如果是6位数字，尝试添加交易所后缀
-                if ticker.isdigit() and len(ticker) == 6:
-                    if ticker.startswith(('000', '002', '300')):
-                        symbols_to_try.append(f"{ticker}.SZ")
-                    elif ticker.startswith(('600', '601', '603', '688')):
-                        symbols_to_try.append(f"{ticker}.SH")
-
-                # 尝试不同的股票代码格式
-                for symbol_format in symbols_to_try:
-                    try:
-                        interact_df = ak.stock_irm_cninfo(symbol=symbol_format)
-                        if not interact_df.empty:
-                            break  # 成功获取数据，跳出循环
-                    except Exception as format_error:
-                        print(f"尝试格式 {symbol_format} 失败: {format_error}")
-                        continue
-
-                # 处理获取到的数据
-                if not interact_df.empty:
-                    # 检查是否有时间列用于过滤
-                    time_columns = ['问题时间', '提问时间', '更新时间']
-                    time_col = None
-                    for col in time_columns:
-                        if col in interact_df.columns:
-                            time_col = col
-                            break
-
-                    if time_col:
-                        try:
-                            # 转换日期格式并过滤最近7天的数据
-                            interact_df[time_col] = pd.to_datetime(interact_df[time_col])
-                            end_date = datetime.strptime(curr_date, "%Y-%m-%d")
-                            start_date = end_date - timedelta(days=7)
-                            recent_data = interact_df[interact_df[time_col] >= start_date]
-                            results['互动平台数据'] = recent_data.head(10).to_dict('records') if not recent_data.empty else interact_df.head(5).to_dict('records')
-                        except:
-                            # 如果日期过滤失败，返回最新的几条数据
-                            results['互动平台数据'] = interact_df.head(5).to_dict('records')
-                    else:
-                        # 没有时间列，返回最新的几条数据
-                        results['互动平台数据'] = interact_df.head(5).to_dict('records')
-                else:
-                    # 如果互动易数据获取失败，尝试获取其他相关数据作为替代
-                    try:
-                        # 尝试获取公司公告数据作为替代
-                        from .tushare_utils import get_tushare_utils
-                        tushare_utils = get_tushare_utils()
-
-                        if tushare_utils.is_chinese_stock(ticker):
-                            ts_symbol = tushare_utils.convert_symbol_to_tushare(ticker)
-                            # 获取最近的公告数据
-                            end_date_obj = datetime.strptime(curr_date, "%Y-%m-%d")
-                            start_date_obj = end_date_obj - timedelta(days=7)
-
-                            announcements = tushare_utils.pro.anns(
-                                ts_code=ts_symbol,
-                                start_date=start_date_obj.strftime('%Y%m%d'),
-                                end_date=end_date_obj.strftime('%Y%m%d')
-                            )
-
-                            if not announcements.empty:
-                                results['互动平台数据'] = announcements.head(5).to_dict('records')
-                            else:
-                                results['互动平台数据'] = []
-                        else:
-                            results['互动平台数据'] = []
-                    except:
-                        results['互动平台数据'] = []
-            else:
-                results['互动平台数据'] = "AKShare 未安装，无法获取互动平台数据"
-
-        except Exception as e:
-            # 如果所有尝试都失败，提供更友好的错误信息
-            results['互动平台数据'] = f"该股票暂无互动平台数据或数据源不支持 (错误: {str(e)[:50]}...)"
-
-        # 4. 股票新闻数据 - Stock News Data
-        try:
-            if AKSHARE_AVAILABLE:
-                # 获取个股新闻
-                news_df = ak.stock_news_em(symbol=ticker)
-                results['股票新闻'] = news_df.head(10).to_dict('records') if not news_df.empty else []
-            else:
-                results['股票新闻'] = "AKShare 未安装，无法获取股票新闻数据"
-
-        except Exception as e:
-            results['股票新闻'] = f"获取失败: {e}"
-
-        # 5. 龙虎榜数据 - Dragon Tiger List Data (反映机构和游资关注度)
-        try:
-            if AKSHARE_AVAILABLE:
-                # 获取龙虎榜数据 - 按日期获取所有股票的龙虎榜数据
-                lhb_df = ak.stock_lhb_detail_em(start_date=curr_date.replace('-', ''), end_date=curr_date.replace('-', ''))
-                # 查找目标股票
-                if not lhb_df.empty and '代码' in lhb_df.columns:
-                    target_lhb = lhb_df[lhb_df['代码'].str.contains(ticker, na=False)]
-                    results['龙虎榜数据'] = target_lhb.to_dict('records') if not target_lhb.empty else []
-                else:
-                    results['龙虎榜数据'] = []
-            else:
-                results['龙虎榜数据'] = "AKShare 未安装，无法获取龙虎榜数据"
-
-        except Exception as e:
-            results['龙虎榜数据'] = f"获取失败: {e}"
-
-        # 6. Tushare 社交媒体相关数据 - Tushare Social Media Related Data
-        try:
-            from .tushare_utils import get_tushare_utils
-            tushare_utils = get_tushare_utils()
-
-            if tushare_utils.is_chinese_stock(ticker):
-                # 获取概念题材数据
-                try:
-                    ts_symbol = tushare_utils.convert_symbol_to_tushare(ticker)
-                    concept_detail = tushare_utils.pro.concept_detail(ts_code=ts_symbol)
-                    results['概念题材'] = concept_detail.to_dict('records') if not concept_detail.empty else []
-                except Exception as e:
-                    results['概念题材'] = f"获取失败: {e}"
-
-                # 获取限售股解禁数据（反映市场关注度）
-                try:
-                    share_float = tushare_utils.pro.share_float(ts_code=ts_symbol, start_date=curr_date.replace('-', ''), end_date=curr_date.replace('-', ''))
-                    results['限售解禁'] = share_float.to_dict('records') if not share_float.empty else []
-                except Exception as e:
-                    results['限售解禁'] = f"获取失败: {e}"
-
-                # 获取股东人数变化（反映散户关注度）
-                try:
-                    # 获取最近的股东人数数据
-                    end_date_obj = datetime.strptime(curr_date, "%Y-%m-%d")
-                    # 查找最近的季度末日期
-                    year = end_date_obj.year
-                    month = end_date_obj.month
-                    if month >= 10:
-                        quarter_end = f"{year}0930"
-                    elif month >= 7:
-                        quarter_end = f"{year}0630"
-                    elif month >= 4:
-                        quarter_end = f"{year}0331"
-                    else:
-                        quarter_end = f"{year-1}1231"
-
-                    stk_holdernumber = tushare_utils.pro.stk_holdernumber(ts_code=ts_symbol, end_date=quarter_end)
-                    results['股东人数'] = stk_holdernumber.to_dict('records') if not stk_holdernumber.empty else []
-                except Exception as e:
-                    results['股东人数'] = f"获取失败: {e}"
-            else:
-                results['概念题材'] = "非中国股票，无法获取 Tushare 数据"
-                results['限售解禁'] = "非中国股票，无法获取 Tushare 数据"
-                results['股东人数'] = "非中国股票，无法获取 Tushare 数据"
-
-        except Exception as e:
-            results['概念题材'] = f"Tushare 获取失败: {e}"
-            results['限售解禁'] = f"Tushare 获取失败: {e}"
-            results['股东人数'] = f"Tushare 获取失败: {e}"
-
-        return format_social_media_report(ticker, curr_date, results)
+        return report
 
     except Exception as e:
-        return f"获取中国社交媒体数据时发生错误: {e}"
-
-
-def get_china_comprehensive_social_media_data(ticker, curr_date):
-    """
-    获取综合的中国社交媒体数据 - 整合所有数据源
-    Get comprehensive Chinese social media data - integrating all data sources
-    """
-    try:
-        # 获取基础社交媒体数据
-        basic_data = get_china_social_media_real_data(ticker, curr_date)
-
-        # 获取主流论坛数据
-        forum_data = get_china_forum_data(ticker, curr_date)
-
-        # 整合报告
-        comprehensive_report = f"""# {ticker} 综合中国社交媒体数据报告
-## 数据日期: {curr_date}
-
-# 第一部分：基础社交媒体数据
-{basic_data}
-
----
-
-# 第二部分：主流投资论坛数据
-{forum_data}
-
----
-
-## 综合分析总结
-基于以上多个数据源的综合分析：
-
-### 数据覆盖范围
-- ✅ **AKShare数据**: 东方财富热度、股票新闻、龙虎榜
-- ✅ **Tushare数据**: 概念题材、股东结构、解禁信息
-- ✅ **论坛数据**: 东方财富股吧、雪球、同花顺
-- ✅ **互动数据**: 投资者问答、公司公告
-
-### 投资者关注度评估
-通过多维度数据分析，该股票的社交媒体表现和投资者关注度可以从新闻热度、论坛讨论、概念题材、股东变化等多个角度进行评估。
-
----
-*综合数据来源: AKShare + Tushare + 主流投资论坛*
-"""
-
-        return comprehensive_report
-
-    except Exception as e:
-        return f"获取综合中国社交媒体数据时发生错误: {e}"
-
-
-def get_china_forum_data(ticker, curr_date):
-    """
-    获取中国主流投资论坛数据 - 增强版，包含更有价值的内容
-    Get data from mainstream Chinese investment forums - Enhanced version with more valuable content
-    """
-    import pandas as pd
-    from datetime import datetime, timedelta
-
-    results = {}
-
-    try:
-        # 1. 东方财富股吧数据 - Eastmoney Forum Data (Enhanced)
-        try:
-            if AKSHARE_AVAILABLE:
-                # 获取东方财富股票评论总览
-                comment_overview = ak.stock_comment_em()
-
-                # 查找目标股票
-                if not comment_overview.empty and '代码' in comment_overview.columns:
-                    target_comment = comment_overview[comment_overview['代码'].str.contains(ticker, na=False)]
-                    results['东方财富股吧总览'] = target_comment.to_dict('records') if not target_comment.empty else []
-                else:
-                    results['东方财富股吧总览'] = []
-
-                # 获取投资者情绪数据 - 每日愿望评论
-                try:
-                    desire_daily = ak.stock_comment_detail_scrd_desire_daily_em(symbol=ticker)
-                    results['投资者情绪变化'] = desire_daily.to_dict('records') if not desire_daily.empty else []
-                except:
-                    results['投资者情绪变化'] = []
-
-                # 获取综合评价历史评分
-                try:
-                    rating_history = ak.stock_comment_detail_zhpj_lspf_em(symbol=ticker)
-                    results['综合评价评分'] = rating_history.head(10).to_dict('records') if not rating_history.empty else []
-                except:
-                    results['综合评价评分'] = []
-
-                # 获取机构参与度数据
-                try:
-                    institution_data = ak.stock_comment_detail_zlkp_jgcyd_em(symbol=ticker)
-                    results['机构参与度变化'] = institution_data.head(10).to_dict('records') if not institution_data.empty else []
-                except:
-                    results['机构参与度变化'] = []
-
-            else:
-                results['东方财富股吧总览'] = "AKShare 未安装，无法获取东方财富股吧数据"
-                results['投资者情绪变化'] = "AKShare 未安装，无法获取投资者情绪数据"
-                results['综合评价评分'] = "AKShare 未安装，无法获取综合评价数据"
-                results['机构参与度变化'] = "AKShare 未安装，无法获取机构参与度数据"
-
-        except Exception as e:
-            results['东方财富股吧总览'] = f"获取失败: {e}"
-            results['投资者情绪变化'] = f"获取失败: {e}"
-            results['综合评价评分'] = f"获取失败: {e}"
-            results['机构参与度变化'] = f"获取失败: {e}"
-
-        # 2. 雪球论坛数据 - Xueqiu Forum Data
-        try:
-            if AKSHARE_AVAILABLE:
-                # 尝试不同的雪球股票代码格式
-                xq_formats = [ticker]
-                if ticker.isdigit() and len(ticker) == 6:
-                    if ticker.startswith(('000', '002', '300')):
-                        xq_formats.extend([f"SZ{ticker}", f"{ticker}.SZ"])
-                    elif ticker.startswith(('600', '601', '603', '688')):
-                        xq_formats.extend([f"SH{ticker}", f"{ticker}.SH"])
-
-                # 尝试获取雪球热门推文
-                xq_tweets = pd.DataFrame()
-                for xq_format in xq_formats:
-                    try:
-                        xq_tweets = ak.stock_hot_tweet_xq(symbol=xq_format)
-                        if not xq_tweets.empty:
-                            break
-                    except:
-                        continue
-
-                results['雪球热门推文'] = xq_tweets.head(10).to_dict('records') if not xq_tweets.empty else []
-
-                # 尝试获取雪球关注数据
-                xq_follow = pd.DataFrame()
-                for xq_format in xq_formats:
-                    try:
-                        xq_follow = ak.stock_hot_follow_xq(symbol=xq_format)
-                        if not xq_follow.empty:
-                            break
-                    except:
-                        continue
-
-                results['雪球关注数据'] = xq_follow.head(10).to_dict('records') if not xq_follow.empty else []
-
-            else:
-                results['雪球热门推文'] = "AKShare 未安装，无法获取雪球数据"
-                results['雪球关注数据'] = "AKShare 未安装，无法获取雪球数据"
-
-        except Exception as e:
-            results['雪球热门推文'] = f"获取失败: {e}"
-            results['雪球关注数据'] = f"获取失败: {e}"
-
-        # 3. 机构研报和分析师观点 - Institution Research and Analyst Views
-        try:
-            if AKSHARE_AVAILABLE:
-                # 获取机构推荐详情
-                try:
-                    institute_recommend = ak.stock_institute_recommend_detail(symbol=ticker)
-                    # 过滤最近的推荐
-                    if not institute_recommend.empty:
-                        # 按评级日期排序，获取最新的推荐
-                        institute_recommend['评级日期'] = pd.to_datetime(institute_recommend['评级日期'])
-                        recent_recommend = institute_recommend.sort_values('评级日期', ascending=False).head(10)
-                        results['机构推荐观点'] = recent_recommend.to_dict('records')
-                    else:
-                        results['机构推荐观点'] = []
-                except Exception as e:
-                    results['机构推荐观点'] = f"获取失败: {e}"
-
-                # 获取研究报告
-                try:
-                    research_reports = ak.stock_research_report_em(symbol=ticker)
-                    if not research_reports.empty:
-                        # 获取最新的研究报告
-                        recent_reports = research_reports.head(5)
-                        results['研究报告'] = recent_reports.to_dict('records')
-                    else:
-                        results['研究报告'] = []
-                except Exception as e:
-                    results['研究报告'] = f"获取失败: {e}"
-
-            else:
-                results['机构推荐观点'] = "AKShare 未安装，无法获取机构推荐数据"
-                results['研究报告'] = "AKShare 未安装，无法获取研究报告数据"
-
-        except Exception as e:
-            results['机构推荐观点'] = f"获取失败: {e}"
-            results['研究报告'] = f"获取失败: {e}"
-
-        # 4. 同花顺论坛数据 - Tonghuashun Forum Data (简化版)
-        try:
-            if AKSHARE_AVAILABLE:
-                # 获取同花顺概念板块信息 (简化，只作为补充)
-                try:
-                    ths_concept = ak.stock_board_concept_name_ths()
-                    if not ths_concept.empty:
-                        results['概念板块参考'] = ths_concept.head(5).to_dict('records')
-                    else:
-                        results['概念板块参考'] = []
-                except:
-                    results['概念板块参考'] = []
-
-            else:
-                results['概念板块参考'] = "AKShare 未安装，无法获取概念板块数据"
-
-        except Exception as e:
-            results['概念板块参考'] = f"获取失败: {e}"
-
-        return format_forum_report(ticker, curr_date, results)
-
-    except Exception as e:
-        return f"获取中国主流论坛数据时发生错误: {e}"
-
-
-def format_forum_report(ticker, curr_date, data):
-    """
-    格式化主流论坛报告
-    Format mainstream forum report
-    """
-
-    def format_forum_section(title, data_dict):
-        if isinstance(data_dict, str):
-            return f"### {title}\n{data_dict}\n"
-
-        result = f"### {title}\n"
-        for category, data_list in data_dict.items():
-            if data_list:
-                result += f"**{category}**:\n"
-                for item in data_list[:3]:  # 只显示前3条
-                    result += f"- {item}\n"
-            else:
-                result += f"**{category}**: 暂无数据\n"
-        return result + "\n"
-
-    def analyze_forum_sentiment(data):
-        """基于论坛数据分析投资者情绪 - 增强版"""
-        sentiment_indicators = []
-        detailed_analysis = []
-
-        # 分析投资者情绪变化
-        sentiment_data = data.get('投资者情绪变化', [])
-        if sentiment_data and not isinstance(sentiment_data, str):
-            try:
-                latest_sentiment = sentiment_data[0] if sentiment_data else {}
-                if '当日意愿上升' in latest_sentiment:
-                    sentiment_value = latest_sentiment['当日意愿上升']
-                    if sentiment_value > 10:
-                        sentiment_indicators.append("投资者情绪较为乐观")
-                        detailed_analysis.append(f"当日意愿上升 {sentiment_value}%，显示积极情绪")
-                    elif sentiment_value < -10:
-                        sentiment_indicators.append("投资者情绪较为悲观")
-                        detailed_analysis.append(f"当日意愿下降 {abs(sentiment_value)}%，显示消极情绪")
-                    else:
-                        sentiment_indicators.append("投资者情绪相对平稳")
-            except:
-                pass
-
-        # 分析综合评价评分
-        rating_data = data.get('综合评价评分', [])
-        if rating_data and not isinstance(rating_data, str):
-            try:
-                latest_rating = rating_data[0] if rating_data else {}
-                if '评分' in latest_rating:
-                    rating_value = latest_rating['评分']
-                    if rating_value > 70:
-                        sentiment_indicators.append("综合评价较高")
-                        detailed_analysis.append(f"最新综合评分 {rating_value:.1f}，属于较高水平")
-                    elif rating_value < 50:
-                        sentiment_indicators.append("综合评价偏低")
-                        detailed_analysis.append(f"最新综合评分 {rating_value:.1f}，需要关注")
-            except:
-                pass
-
-        # 分析机构推荐观点
-        recommend_data = data.get('机构推荐观点', [])
-        if recommend_data and not isinstance(recommend_data, str):
-            try:
-                buy_count = sum(1 for item in recommend_data if '买入' in str(item.get('最新评级', '')))
-                hold_count = sum(1 for item in recommend_data if '持有' in str(item.get('最新评级', '')))
-                total_count = len(recommend_data)
-
-                if buy_count > total_count * 0.6:
-                    sentiment_indicators.append("机构普遍看好")
-                    detailed_analysis.append(f"近期 {total_count} 家机构中 {buy_count} 家给出买入评级")
-                elif buy_count > 0:
-                    sentiment_indicators.append("机构观点偏积极")
-                    detailed_analysis.append(f"近期 {total_count} 家机构中 {buy_count} 家给出买入评级")
-            except:
-                pass
-
-        # 分析研究报告
-        report_data = data.get('研究报告', [])
-        if report_data and not isinstance(report_data, str):
-            try:
-                report_count = len(report_data)
-                if report_count > 0:
-                    sentiment_indicators.append("机构研究关注度较高")
-                    detailed_analysis.append(f"近期有 {report_count} 份研究报告发布")
-            except:
-                pass
-
-        # 分析机构参与度
-        institution_data = data.get('机构参与度变化', [])
-        if institution_data and not isinstance(institution_data, str):
-            try:
-                if len(institution_data) >= 2:
-                    latest = institution_data[0]['机构参与度']
-                    previous = institution_data[1]['机构参与度']
-                    if latest > previous:
-                        sentiment_indicators.append("机构参与度上升")
-                        detailed_analysis.append(f"机构参与度从 {previous:.1f}% 上升至 {latest:.1f}%")
-                    elif latest < previous:
-                        sentiment_indicators.append("机构参与度下降")
-                        detailed_analysis.append(f"机构参与度从 {previous:.1f}% 下降至 {latest:.1f}%")
-            except:
-                pass
-
-        # 生成分析报告
-        if sentiment_indicators:
-            analysis = "基于主流论坛和机构数据分析，该股票具有以下特征：\n"
-            analysis += "\n".join([f"- {indicator}" for indicator in sentiment_indicators])
-
-            if detailed_analysis:
-                analysis += "\n\n详细分析：\n"
-                analysis += "\n".join([f"• {detail}" for detail in detailed_analysis])
-
-            return analysis
-        else:
-            return "基于当前数据，该股票在主流论坛和机构关注度相对较低。"
-
-    report = f"""# {ticker} 中国主流投资论坛数据报告 (增强版)
-## 数据日期: {curr_date}
-
-## 1. 东方财富投资者情绪数据
-{format_forum_section("投资者情绪分析", {
-    '股吧总览': data.get('东方财富股吧总览', []),
-    '情绪变化': data.get('投资者情绪变化', []),
-    '综合评分': data.get('综合评价评分', []),
-    '机构参与度': data.get('机构参与度变化', [])
-})}
-
-## 2. 机构研报和分析师观点
-{format_forum_section("专业机构观点", {
-    '机构推荐': data.get('机构推荐观点', []),
-    '研究报告': data.get('研究报告', [])
-})}
-
-## 3. 雪球论坛数据
-{format_forum_section("雪球论坛", {
-    '热门推文': data.get('雪球热门推文', []),
-    '关注数据': data.get('雪球关注数据', [])
-})}
-
-## 4. 市场概念参考
-{format_forum_section("概念板块", {
-    '相关概念': data.get('概念板块参考', [])
-})}
-
-## 5. 综合情绪分析
-{analyze_forum_sentiment(data)}
-
----
-*数据来源: 东方财富(情绪+机构) + 雪球 + 研报分析 - 增强版投资者情绪分析*
-"""
-    return report
-
-
-def format_social_media_report(ticker, curr_date, data):
-    """
-    格式化社交媒体报告
-    Format social media report
-    """
-
-    def format_data_section(title, data_dict):
-        if isinstance(data_dict, str):
-            return f"### {title}\n{data_dict}\n"
-
-        result = f"### {title}\n"
-        for category, data_list in data_dict.items():
-            if data_list:
-                result += f"**{category}**:\n"
-                for item in data_list[:3]:  # 只显示前3条
-                    result += f"- {item}\n"
-            else:
-                result += f"**{category}**: 暂无数据\n"
-        return result + "\n"
-
-    def analyze_sentiment(data):
-        """基于获取的数据分析投资者情绪"""
-        sentiment_indicators = []
-
-        # 分析东方财富数据
-        em_data = data.get('东方财富数据', {})
-        if isinstance(em_data, dict):
-            if em_data.get('人气排行'):
-                sentiment_indicators.append("东方财富平台人气较高")
-            if em_data.get('飙升排行'):
-                sentiment_indicators.append("东方财富平台热度飙升")
-
-        # 分析个股热度数据
-        heat_data = data.get('个股热度详情', {})
-        if isinstance(heat_data, dict):
-            if heat_data.get('热度排行') or heat_data.get('实时热度'):
-                sentiment_indicators.append("个股热度数据显示关注度较高")
-        elif heat_data and not isinstance(heat_data, str):
-            sentiment_indicators.append("个股热度数据显示关注度较高")
-
-        # 分析互动数据
-        interact_data = data.get('互动平台数据', [])
-        if interact_data and not isinstance(interact_data, str):
-            sentiment_indicators.append("投资者互动较为活跃")
-
-        # 分析新闻数据
-        news_data = data.get('股票新闻', [])
-        if news_data and not isinstance(news_data, str):
-            sentiment_indicators.append("近期新闻关注度较高")
-
-        # 分析龙虎榜数据
-        lhb_data = data.get('龙虎榜数据', [])
-        if lhb_data and not isinstance(lhb_data, str):
-            sentiment_indicators.append("机构和游资关注度较高")
-
-        # 分析概念题材数据
-        concept_data = data.get('概念题材', [])
-        if concept_data and not isinstance(concept_data, str):
-            sentiment_indicators.append("属于热门概念题材")
-
-        # 分析限售解禁数据
-        float_data = data.get('限售解禁', [])
-        if float_data and not isinstance(float_data, str):
-            sentiment_indicators.append("近期有限售股解禁，需关注流通盘变化")
-
-        # 分析股东人数数据
-        holder_data = data.get('股东人数', [])
-        if holder_data and not isinstance(holder_data, str):
-            sentiment_indicators.append("股东人数数据可用，反映散户参与度")
-
-        if sentiment_indicators:
-            return "基于真实数据分析，该股票具有以下特征：\n" + "\n".join([f"- {indicator}" for indicator in sentiment_indicators])
-        else:
-            return "基于当前数据，该股票在金融平台的活跃度相对较低。"
-
-    report = f"""# {ticker} 中国社交媒体数据报告 (真实数据)
-## 数据日期: {curr_date}
-
-## 1. 东方财富平台数据
-{format_data_section("东方财富平台", data.get('东方财富数据', {}))}
-
-## 2. 个股热度详情
-{format_data_section("个股热度", data.get('个股热度详情', {}) if isinstance(data.get('个股热度详情', {}), dict) else {'热度数据': data.get('个股热度详情', [])})}
-
-## 3. 互动平台数据
-{format_data_section("互动平台", {'投资者互动': data.get('互动平台数据', [])})}
-
-## 4. 股票新闻
-{format_data_section("股票新闻", {'最新新闻': data.get('股票新闻', [])})}
-
-## 5. 龙虎榜数据
-{format_data_section("龙虎榜", {'机构游资': data.get('龙虎榜数据', [])})}
-
-## 6. Tushare 社交媒体相关数据
-{format_data_section("概念题材", {'概念分类': data.get('概念题材', [])})}
-{format_data_section("限售解禁", {'解禁情况': data.get('限售解禁', [])})}
-{format_data_section("股东人数", {'股东变化': data.get('股东人数', [])})}
-
-## 7. 投资者情绪分析
-{analyze_sentiment(data)}
-
----
-*数据来源: AKShare + Tushare - 真实的中国金融平台数据*
-"""
-    return report
-
-
-def get_global_news_openai(curr_date):
-    config = get_config()
-
-    # Check if using Google provider
-    if config.get("llm_provider", "").lower() == "google":
-        # Configure the Gemini client
-        client = genai.Client()
-
-        # Define the grounding tool for Google Search
-        grounding_tool = types.Tool(
-            google_search=types.GoogleSearch()
-        )
-
-        # Configure generation settings
-        generation_config = types.GenerateContentConfig(
-            tools=[grounding_tool],
-            temperature=1,
-            max_output_tokens=4096,
-            top_p=1,
-        )
-
-        # Make the request
-        response = client.models.generate_content(
-            model=config["quick_think_llm"],
-            contents=f"Can you search global or macroeconomics news from 7 days before {curr_date} to {curr_date} that would be informative for trading purposes? Please prioritize and include more Chinese economic news, Chinese market news, Chinese policy news, and China-related international trade news. Also include other major global economic news from US, Europe, and other regions. Make sure you only get the data posted during that period. Focus on: 1) Chinese economic indicators and policies (40% weight), 2) Chinese stock market and financial sector news (30% weight), 3) Global economic news affecting China (20% weight), 4) Other major global economic news (10% weight).",
-            config=generation_config,
-        )
-
-        return response.text
-    else:
-        # Original OpenAI implementation
-        client = OpenAI(base_url=config["backend_url"])
-
-        response = client.responses.create(
-            model=config["quick_think_llm"],
-            input=[
-                {
-                    "role": "system",
-                    "content": [
-                        {
-                            "type": "input_text",
-                            "text": f"Can you search global or macroeconomics news from 7 days before {curr_date} to {curr_date} that would be informative for trading purposes? Please prioritize and include more Chinese economic news, Chinese market news, Chinese policy news, and China-related international trade news. Also include other major global economic news from US, Europe, and other regions. Make sure you only get the data posted during that period. Focus on: 1) Chinese economic indicators and policies (40% weight), 2) Chinese stock market and financial sector news (30% weight), 3) Global economic news affecting China (20% weight), 4) Other major global economic news (10% weight).",
-                        }
-                    ],
-                }
-            ],
-            text={"format": {"type": "text"}},
-            reasoning={},
-            tools=[
-                {
-                    "type": "web_search_preview",
-                    "user_location": {"type": "approximate"},
-                    "search_context_size": "medium",  # Increased context size for better coverage
-                }
-            ],
-            temperature=1,
-            max_output_tokens=4096,
-            top_p=1,
-            store=True,
-        )
-
-        return response.output[1].content[0].text
-
-
+        return f"获取股票新闻时发生错误: {str(e)}"
 def get_china_focused_news_openai(curr_date):
     """
     Get China-focused economic and market news using OpenAI API or Google Gemini API

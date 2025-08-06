@@ -9,21 +9,9 @@ def create_social_media_analyst(llm, toolkit):
         ticker = state["company_of_interest"]
         company_name = state["company_of_interest"]
 
-        if toolkit.config["online_tools"]:
-            tools = [
-                toolkit.get_stock_news_openai,
-                toolkit.get_china_social_media_openai,
-                toolkit.get_china_social_media_real_data,
-                toolkit.get_china_forum_data,
-                toolkit.get_china_comprehensive_social_media_data,
-            ]
-        else:
-            tools = [
-                toolkit.get_reddit_stock_info,
-                toolkit.get_china_social_media_real_data,  # Real data doesn't require online tools
-                toolkit.get_china_forum_data,  # Forum data doesn't require online tools
-                toolkit.get_china_comprehensive_social_media_data,  # Comprehensive data
-            ]
+        tools = [
+            toolkit.get_stock_news_openai,
+        ]
 
         system_message = (
             "You are a social media and company specific news researcher/analyst tasked with analyzing social media posts, recent company news, and public sentiment for a specific company over the past week. You will be given a company's name your objective is to write a comprehensive long report detailing your analysis, insights, and implications for traders and investors on this company's current state after looking at social media and what people are saying about that company, analyzing sentiment data of what people feel each day about the company, and looking at recent company news. Try to look at all sources possible from social media to sentiment to news. Do not simply state the trends are mixed, provide detailed and finegrained analysis and insights that may help traders make decisions."
