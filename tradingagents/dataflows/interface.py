@@ -37,48 +37,6 @@ except ImportError:
     print("Warning: AKShare not available, real social media data features will be limited")
 
 
-def get_finnhub_news(
-    ticker: Annotated[
-        str,
-        "Search query of a company's, e.g. 'AAPL, TSM, etc.",
-    ],
-    curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
-    look_back_days: Annotated[int, "how many days to look back"],
-):
-    """
-    Retrieve news about a company within a time frame
-
-    Args
-        ticker (str): ticker for the company you are interested in
-        start_date (str): Start date in yyyy-mm-dd format
-        end_date (str): End date in yyyy-mm-dd format
-    Returns
-        str: dataframe containing the news of the company in the time frame
-
-    """
-
-    start_date = datetime.strptime(curr_date, "%Y-%m-%d")
-    before = start_date - relativedelta(days=look_back_days)
-    before = before.strftime("%Y-%m-%d")
-
-    result = get_data_in_range(ticker, before, curr_date, "news_data", DATA_DIR)
-
-    if len(result) == 0:
-        return ""
-
-    combined_result = ""
-    for day, data in result.items():
-        if len(data) == 0:
-            continue
-        for entry in data:
-            current_news = (
-                "### " + entry["headline"] + f" ({day})" + "\n" + entry["summary"]
-            )
-            combined_result += current_news + "\n\n"
-
-    return f"## {ticker} News, from {before} to {curr_date}:\n" + str(combined_result)
-
-
 def get_finnhub_company_insider_sentiment(
     ticker: Annotated[str, "ticker symbol for the company"],
     curr_date: Annotated[
@@ -327,58 +285,6 @@ def get_google_news(
         return ""
 
     return f"## {query} Google News, from {before} to {curr_date}:\n\n{news_str}"
-
-
-def get_reddit_global_news(
-    start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
-    look_back_days: Annotated[int, "how many days to look back"],
-    max_limit_per_day: Annotated[int, "Maximum number of news per day"],
-) -> str:
-    """
-    Retrieve the latest top reddit news
-    Args:
-        start_date: Start date in yyyy-mm-dd format
-        end_date: End date in yyyy-mm-dd format
-    Returns:
-        str: A formatted dataframe containing the latest news articles posts on reddit and meta information in these columns: "created_utc", "id", "title", "selftext", "score", "num_comments", "url"
-    """
-
-    start_date = datetime.strptime(start_date, "%Y-%m-%d")
-    before = start_date - relativedelta(days=look_back_days)
-    before = before.strftime("%Y-%m-%d")
-
-    posts = []
-    # iterate from start_date to end_date
-    curr_date = datetime.strptime(before, "%Y-%m-%d")
-
-    total_iterations = (start_date - curr_date).days + 1
-    pbar = tqdm(desc=f"Getting Global News on {start_date}", total=total_iterations)
-
-    while curr_date <= start_date:
-        curr_date_str = curr_date.strftime("%Y-%m-%d")
-        fetch_result = fetch_top_from_category(
-            "global_news",
-            curr_date_str,
-            max_limit_per_day,
-            data_path=os.path.join(DATA_DIR, "reddit_data"),
-        )
-        posts.extend(fetch_result)
-        curr_date += relativedelta(days=1)
-        pbar.update(1)
-
-    pbar.close()
-
-    if len(posts) == 0:
-        return ""
-
-    news_str = ""
-    for post in posts:
-        if post["content"] == "":
-            news_str += f"### {post['title']}\n\n"
-        else:
-            news_str += f"### {post['title']}\n\n{post['content']}\n\n"
-
-    return f"## Global News Reddit, from {before} to {curr_date}:\n{news_str}"
 
 
 def get_reddit_company_news(

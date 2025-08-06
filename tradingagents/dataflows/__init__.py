@@ -8,11 +8,9 @@ from .tushare_utils import TushareUtils, get_tushare_utils
 
 from .interface import (
     # News and sentiment functions
-    get_finnhub_news,
     get_finnhub_company_insider_sentiment,
     get_finnhub_company_insider_transactions,
     get_google_news,
-    get_reddit_global_news,
     get_reddit_company_news,
     get_china_focused_news_openai,
     get_china_social_media_openai,
@@ -34,11 +32,9 @@ from .interface import (
 
 __all__ = [
     # News and sentiment functions
-    "get_finnhub_news",
     "get_finnhub_company_insider_sentiment",
     "get_finnhub_company_insider_transactions",
     "get_google_news",
-    "get_reddit_global_news",
     "get_reddit_company_news",
     "get_china_focused_news_openai",
     "get_china_social_media_openai",

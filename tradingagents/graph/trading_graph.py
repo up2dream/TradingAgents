@@ -141,9 +141,6 @@ class TradingAgentsGraph:
                     self.toolkit.get_global_news_openai,
                     self.toolkit.get_china_focused_news_openai,
                     self.toolkit.get_google_news,
-                    # offline tools
-                    self.toolkit.get_finnhub_news,
-                    self.toolkit.get_reddit_news,
                 ]
             ),
             "fundamentals": ToolNode(
