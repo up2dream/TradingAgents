@@ -1064,9 +1064,12 @@ def get_fundamentals_openai(ticker, curr_date):
         return response.output[1].content[0].text
 
 
-def get_sina_global_financial_news() -> str:
+def get_sina_global_financial_news(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
     """
     获取新浪财经全球财经快讯
+
+    Args:
+        curr_date (str): current date you are trading at, yyyy-mm-dd
 
     Returns:
         str: 格式化的全球财经快讯字符串，包含时间和内容
@@ -1078,12 +1081,53 @@ def get_sina_global_financial_news() -> str:
         if news_df.empty:
             return "暂无全球财经快讯数据"
 
-        # 格式化输出
-        news_str = "## 新浪财经-全球财经快讯\n\n"
+        # 过滤当天的新闻
+        curr_date_obj = datetime.strptime(curr_date, "%Y-%m-%d")
+        filtered_news = []
 
         for index, row in news_df.iterrows():
             time_str = row['时间']
             content = row['内容']
+
+            try:
+                # 解析时间字符串，支持多种格式
+                news_time = None
+                time_str_clean = str(time_str).strip()
+
+                # 尝试不同的时间格式
+                time_formats = [
+                    "%Y-%m-%d %H:%M:%S",  # YYYY-MM-DD HH:MM:SS
+                    "%Y-%m-%d %H:%M",     # YYYY-MM-DD HH:MM
+                    "%Y-%m-%d",           # YYYY-MM-DD
+                    "%m-%d %H:%M",        # MM-DD HH:MM
+                ]
+
+                for fmt in time_formats:
+                    try:
+                        if fmt == "%m-%d %H:%M":
+                            # 对于 MM-DD HH:MM 格式，添加当前年份
+                            time_with_year = f"{curr_date_obj.year}-{time_str_clean}"
+                            news_time = datetime.strptime(time_with_year, "%Y-%m-%d %H:%M")
+                        else:
+                            news_time = datetime.strptime(time_str_clean, fmt)
+                        break
+                    except ValueError:
+                        continue
+
+                # 检查是否为当天新闻
+                if news_time and news_time.date() == curr_date_obj.date():
+                    filtered_news.append((time_str, content))
+            except:
+                # 如果时间解析失败，跳过该条新闻
+                continue
+
+        if not filtered_news:
+            return f"暂无 {curr_date} 当天的新浪财经全球财经快讯数据"
+
+        # 格式化输出
+        news_str = f"## 新浪财经-全球财经快讯 ({curr_date})\n\n"
+
+        for time_str, content in filtered_news:
             news_str += f"**{time_str}**\n{content}\n\n"
 
         return news_str
@@ -1092,9 +1136,12 @@ def get_sina_global_financial_news() -> str:
         return f"获取新浪财经全球财经快讯时发生错误: {str(e)}"
 
 
-def get_eastmoney_financial_breakfast() -> str:
+def get_eastmoney_financial_breakfast(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
     """
     获取东方财富财经早餐
+
+    Args:
+        curr_date (str): current date you are trading at, yyyy-mm-dd
 
     Returns:
         str: 格式化的财经早餐字符串，包含标题、摘要、发布时间和链接
@@ -1106,18 +1153,49 @@ def get_eastmoney_financial_breakfast() -> str:
         if breakfast_df.empty:
             return "暂无财经早餐数据"
 
-        # 格式化输出，只显示最近10条
-        breakfast_str = "## 东方财富-财经早餐\n\n"
+        # 过滤当天的新闻
+        curr_date_obj = datetime.strptime(curr_date, "%Y-%m-%d")
+        filtered_news = []
 
-        # 取最新的10条数据
-        recent_data = breakfast_df.head(10)
-
-        for index, row in recent_data.iterrows():
+        for index, row in breakfast_df.iterrows():
             title = row['标题']
             summary = row['摘要']
             publish_time = row['发布时间']
             link = row['链接']
 
+            try:
+                # 解析发布时间，支持多种格式
+                news_time = None
+                publish_time_clean = str(publish_time).strip()
+
+                # 尝试不同的时间格式
+                time_formats = [
+                    "%Y-%m-%d %H:%M:%S",  # YYYY-MM-DD HH:MM:SS
+                    "%Y-%m-%d %H:%M",     # YYYY-MM-DD HH:MM
+                    "%Y-%m-%d",           # YYYY-MM-DD
+                ]
+
+                for fmt in time_formats:
+                    try:
+                        news_time = datetime.strptime(publish_time_clean, fmt)
+                        break
+                    except ValueError:
+                        continue
+
+                # 检查是否为当天新闻
+                if news_time and news_time.date() == curr_date_obj.date():
+                    filtered_news.append((title, summary, publish_time, link))
+            except:
+                # 如果时间解析失败，跳过该条新闻
+                continue
+
+        if not filtered_news:
+            return f"暂无 {curr_date} 当天的东方财富财经早餐数据"
+
+        # 格式化输出
+        breakfast_str = f"## 东方财富-财经早餐 ({curr_date})\n\n"
+
+        for title, summary, publish_time, link in filtered_news:
             breakfast_str += f"### {title}\n"
             breakfast_str += f"**发布时间**: {publish_time}\n\n"
             breakfast_str += f"{summary}\n\n"
@@ -1130,9 +1208,12 @@ def get_eastmoney_financial_breakfast() -> str:
         return f"获取东方财富财经早餐时发生错误: {str(e)}"
 
 
-def get_eastmoney_global_financial_news() -> str:
+def get_eastmoney_global_financial_news(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
     """
     获取东方财富全球财经快讯
+
+    Args:
+        curr_date (str): current date you are trading at, yyyy-mm-dd
 
     Returns:
         str: 格式化的全球财经快讯字符串，包含标题、摘要、发布时间和链接
@@ -1144,18 +1225,49 @@ def get_eastmoney_global_financial_news() -> str:
         if news_df.empty:
             return "暂无东方财富全球财经快讯数据"
 
-        # 格式化输出，显示最新15条
-        news_str = "## 东方财富-全球财经快讯\n\n"
+        # 过滤当天的新闻
+        curr_date_obj = datetime.strptime(curr_date, "%Y-%m-%d")
+        filtered_news = []
 
-        # 取最新的15条数据
-        recent_data = news_df.head(15)
-
-        for index, row in recent_data.iterrows():
+        for index, row in news_df.iterrows():
             title = row['标题']
             summary = row['摘要']
             publish_time = row['发布时间']
             link = row['链接']
 
+            try:
+                # 解析发布时间，支持多种格式
+                news_time = None
+                publish_time_clean = str(publish_time).strip()
+
+                # 尝试不同的时间格式
+                time_formats = [
+                    "%Y-%m-%d %H:%M:%S",  # YYYY-MM-DD HH:MM:SS
+                    "%Y-%m-%d %H:%M",     # YYYY-MM-DD HH:MM
+                    "%Y-%m-%d",           # YYYY-MM-DD
+                ]
+
+                for fmt in time_formats:
+                    try:
+                        news_time = datetime.strptime(publish_time_clean, fmt)
+                        break
+                    except ValueError:
+                        continue
+
+                # 检查是否为当天新闻
+                if news_time and news_time.date() == curr_date_obj.date():
+                    filtered_news.append((title, summary, publish_time, link))
+            except:
+                # 如果时间解析失败，跳过该条新闻
+                continue
+
+        if not filtered_news:
+            return f"暂无 {curr_date} 当天的东方财富全球财经快讯数据"
+
+        # 格式化输出
+        news_str = f"## 东方财富-全球财经快讯 ({curr_date})\n\n"
+
+        for title, summary, publish_time, link in filtered_news:
             news_str += f"### {title}\n"
             news_str += f"**发布时间**: {publish_time}\n\n"
             news_str += f"{summary}\n\n"
@@ -1168,9 +1280,12 @@ def get_eastmoney_global_financial_news() -> str:
         return f"获取东方财富全球财经快讯时发生错误: {str(e)}"
 
 
-def get_futu_financial_news() -> str:
+def get_futu_financial_news(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
     """
     获取富途牛牛快讯
+
+    Args:
+        curr_date (str): current date you are trading at, yyyy-mm-dd
 
     Returns:
         str: 格式化的富途牛牛快讯字符串，包含标题、内容、发布时间和链接
@@ -1182,18 +1297,49 @@ def get_futu_financial_news() -> str:
         if news_df.empty:
             return "暂无富途牛牛快讯数据"
 
-        # 格式化输出，显示最新15条
-        news_str = "## 富途牛牛-快讯\n\n"
+        # 过滤当天的新闻
+        curr_date_obj = datetime.strptime(curr_date, "%Y-%m-%d")
+        filtered_news = []
 
-        # 取最新的15条数据
-        recent_data = news_df.head(15)
-
-        for index, row in recent_data.iterrows():
+        for index, row in news_df.iterrows():
             title = row['标题']
             content = row['内容']
             publish_time = row['发布时间']
             link = row['链接']
 
+            try:
+                # 解析发布时间，支持多种格式
+                news_time = None
+                publish_time_clean = str(publish_time).strip()
+
+                # 尝试不同的时间格式
+                time_formats = [
+                    "%Y-%m-%d %H:%M:%S",  # YYYY-MM-DD HH:MM:SS
+                    "%Y-%m-%d %H:%M",     # YYYY-MM-DD HH:MM
+                    "%Y-%m-%d",           # YYYY-MM-DD
+                ]
+
+                for fmt in time_formats:
+                    try:
+                        news_time = datetime.strptime(publish_time_clean, fmt)
+                        break
+                    except ValueError:
+                        continue
+
+                # 检查是否为当天新闻
+                if news_time and news_time.date() == curr_date_obj.date():
+                    filtered_news.append((title, content, publish_time, link))
+            except:
+                # 如果时间解析失败，跳过该条新闻
+                continue
+
+        if not filtered_news:
+            return f"暂无 {curr_date} 当天的富途牛牛快讯数据"
+
+        # 格式化输出
+        news_str = f"## 富途牛牛-快讯 ({curr_date})\n\n"
+
+        for title, content, publish_time, link in filtered_news:
             news_str += f"### {title}\n"
             news_str += f"**发布时间**: {publish_time}\n\n"
             news_str += f"{content}\n\n"
@@ -1206,9 +1352,12 @@ def get_futu_financial_news() -> str:
         return f"获取富途牛牛快讯时发生错误: {str(e)}"
 
 
-def get_tonghuashun_global_financial_live() -> str:
+def get_tonghuashun_global_financial_live(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
     """
     获取同花顺全球财经直播
+
+    Args:
+        curr_date (str): current date you are trading at, yyyy-mm-dd
 
     Returns:
         str: 格式化的同花顺全球财经直播字符串，包含标题、内容、发布时间和链接
@@ -1220,8 +1369,9 @@ def get_tonghuashun_global_financial_live() -> str:
         if news_df.empty:
             return "暂无同花顺全球财经直播数据"
 
-        # 格式化输出，显示所有数据（通常20条）
-        news_str = "## 同花顺财经-全球财经直播\n\n"
+        # 过滤当天的新闻
+        curr_date_obj = datetime.strptime(curr_date, "%Y-%m-%d")
+        filtered_news = []
 
         for index, row in news_df.iterrows():
             title = row['标题']
@@ -1229,6 +1379,39 @@ def get_tonghuashun_global_financial_live() -> str:
             publish_time = row['发布时间']
             link = row['链接']
 
+            try:
+                # 解析发布时间，支持多种格式
+                news_time = None
+                publish_time_clean = str(publish_time).strip()
+
+                # 尝试不同的时间格式
+                time_formats = [
+                    "%Y-%m-%d %H:%M:%S",  # YYYY-MM-DD HH:MM:SS
+                    "%Y-%m-%d %H:%M",     # YYYY-MM-DD HH:MM
+                    "%Y-%m-%d",           # YYYY-MM-DD
+                ]
+
+                for fmt in time_formats:
+                    try:
+                        news_time = datetime.strptime(publish_time_clean, fmt)
+                        break
+                    except ValueError:
+                        continue
+
+                # 检查是否为当天新闻
+                if news_time and news_time.date() == curr_date_obj.date():
+                    filtered_news.append((title, content, publish_time, link))
+            except:
+                # 如果时间解析失败，跳过该条新闻
+                continue
+
+        if not filtered_news:
+            return f"暂无 {curr_date} 当天的同花顺全球财经直播数据"
+
+        # 格式化输出
+        news_str = f"## 同花顺财经-全球财经直播 ({curr_date})\n\n"
+
+        for title, content, publish_time, link in filtered_news:
             news_str += f"### {title}\n"
             news_str += f"**发布时间**: {publish_time}\n\n"
             news_str += f"{content}\n\n"
@@ -1241,9 +1424,12 @@ def get_tonghuashun_global_financial_live() -> str:
         return f"获取同花顺全球财经直播时发生错误: {str(e)}"
 
 
-def get_cailianshe_telegraph() -> str:
+def get_cailianshe_telegraph(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
     """
     获取财联社电报
+
+    Args:
+        curr_date (str): current date you are trading at, yyyy-mm-dd
 
     Returns:
         str: 格式化的财联社电报字符串，包含标题、内容、发布日期和发布时间
@@ -1255,8 +1441,9 @@ def get_cailianshe_telegraph() -> str:
         if news_df.empty:
             return "暂无财联社电报数据"
 
-        # 格式化输出，显示所有数据（通常20条）
-        news_str = "## 财联社-电报\n\n"
+        # 过滤当天的新闻
+        curr_date_obj = datetime.strptime(curr_date, "%Y-%m-%d")
+        filtered_news = []
 
         for index, row in news_df.iterrows():
             title = row['标题']
@@ -1264,6 +1451,24 @@ def get_cailianshe_telegraph() -> str:
             publish_date = row['发布日期']
             publish_time = row['发布时间']
 
+            try:
+                # 解析发布日期，通常格式为 "YYYY-MM-DD"
+                news_date = datetime.strptime(str(publish_date), "%Y-%m-%d")
+
+                # 检查是否为当天新闻
+                if news_date.date() == curr_date_obj.date():
+                    filtered_news.append((title, content, publish_date, publish_time))
+            except:
+                # 如果日期解析失败，跳过该条新闻
+                continue
+
+        if not filtered_news:
+            return f"暂无 {curr_date} 当天的财联社电报数据"
+
+        # 格式化输出
+        news_str = f"## 财联社-电报 ({curr_date})\n\n"
+
+        for title, content, publish_date, publish_time in filtered_news:
             news_str += f"### {title}\n"
             news_str += f"**发布时间**: {publish_date} {publish_time}\n\n"
             news_str += f"{content}\n\n"
@@ -1275,9 +1480,12 @@ def get_cailianshe_telegraph() -> str:
         return f"获取财联社电报时发生错误: {str(e)}"
 
 
-def get_sina_securities_original() -> str:
+def get_sina_securities_original(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
     """
     获取新浪财经证券原创
+
+    Args:
+        curr_date (str): current date you are trading at, yyyy-mm-dd
 
     Returns:
         str: 格式化的新浪财经证券原创字符串，包含时间、内容和链接
@@ -1289,14 +1497,54 @@ def get_sina_securities_original() -> str:
         if news_df.empty:
             return "暂无新浪财经证券原创数据"
 
-        # 格式化输出，显示所有数据
-        news_str = "## 新浪财经-证券原创\n\n"
+        # 过滤当天的新闻
+        curr_date_obj = datetime.strptime(curr_date, "%Y-%m-%d")
+        filtered_news = []
 
         for index, row in news_df.iterrows():
             time = row['时间']
             content = row['内容']
             link = row['链接']
 
+            try:
+                # 解析时间字符串，支持多种格式
+                news_time = None
+                time_clean = str(time).strip()
+
+                # 尝试不同的时间格式
+                time_formats = [
+                    "%Y-%m-%d %H:%M:%S",  # YYYY-MM-DD HH:MM:SS
+                    "%Y-%m-%d %H:%M",     # YYYY-MM-DD HH:MM
+                    "%Y-%m-%d",           # YYYY-MM-DD
+                    "%m-%d %H:%M",        # MM-DD HH:MM
+                ]
+
+                for fmt in time_formats:
+                    try:
+                        if fmt == "%m-%d %H:%M":
+                            # 对于 MM-DD HH:MM 格式，添加当前年份
+                            time_with_year = f"{curr_date_obj.year}-{time_clean}"
+                            news_time = datetime.strptime(time_with_year, "%Y-%m-%d %H:%M")
+                        else:
+                            news_time = datetime.strptime(time_clean, fmt)
+                        break
+                    except ValueError:
+                        continue
+
+                # 检查是否为当天新闻
+                if news_time and news_time.date() == curr_date_obj.date():
+                    filtered_news.append((time, content, link))
+            except:
+                # 如果时间解析失败，跳过该条新闻
+                continue
+
+        if not filtered_news:
+            return f"暂无 {curr_date} 当天的新浪财经证券原创数据"
+
+        # 格式化输出
+        news_str = f"## 新浪财经-证券原创 ({curr_date})\n\n"
+
+        for time, content, link in filtered_news:
             news_str += f"### {content}\n"
             news_str += f"**发布时间**: {time}\n\n"
             news_str += f"[查看详情]({link})\n\n"

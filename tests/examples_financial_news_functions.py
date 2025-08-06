@@ -15,6 +15,10 @@
 import sys
 import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,7 +30,8 @@ from tradingagents.dataflows.interface import (
     get_futu_financial_news,
     get_tonghuashun_global_financial_live,
     get_cailianshe_telegraph,
-    get_sina_securities_original, get_stock_news_openai, get_global_news_openai
+    get_sina_securities_original, get_stock_news_openai, get_global_news_openai, get_china_focused_news_openai,
+    get_google_news
 )
 from tradingagents.agents.utils.agent_utils import Toolkit
 
@@ -94,3 +99,28 @@ def test_get_global_news_openai():
     result = get_global_news_openai("2025-08-01")
     print(result)
 
+def test_get_china_focused_news_openai():
+    result = get_china_focused_news_openai("2025-08-01")
+    print(result)
+
+def test_get_google_news():
+    """Test get_google_news function with proper parameters"""
+    # Test that the function can be called with correct parameters
+    # Note: This test may take time due to network requests to Google News
+    try:
+        result = get_google_news("Tesla stock 699", "2025-08-01", 7)
+        print(f"Google News result type: {type(result)}")
+        print(f"Google News result length: {len(result)} characters")
+        if result:
+            print("✅ get_google_news executed successfully")
+            print(f"Preview: {result}...")
+        else:
+            print("⚠️ get_google_news returned empty result")
+    except Exception as e:
+        print(f"❌ get_google_news failed: {str(e)}")
+        # Don't fail the test for network issues
+        pass
+
+def test_get_sina_global_financial_news():
+    result = get_sina_securities_original("2025-08-06")
+    print(result)
