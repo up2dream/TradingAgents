@@ -76,7 +76,7 @@ def main():
     """Main function with command line argument support."""
     parser = argparse.ArgumentParser(description="TradingAgents Stock Analysis")
     parser.add_argument("--stock", "-s", default="688111", help="Stock symbol to analyze (default: 688111)")
-    parser.add_argument("--date", "-d", default="2025-08-01", help="Analysis date (default: 2025-08-01)")
+    parser.add_argument("--date", "-d", default=datetime.now().strftime('%Y-%m-%d'), help="Analysis date (default: today)")
     parser.add_argument("--config-file", help="Custom config file path")
 
     args = parser.parse_args()
