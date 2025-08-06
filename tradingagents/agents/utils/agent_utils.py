@@ -374,6 +374,36 @@ class Toolkit:
 
     @staticmethod
     @tool
+    def get_fundamentals_tushare(
+        ticker: Annotated[str, "Stock ticker symbol (e.g., '000001' or '600000')"],
+        curr_date: Annotated[str, "Current date in YYYY-MM-DD format"]
+    ):
+        """
+        Get comprehensive fundamental data for a Chinese stock using Tushare API.
+
+        This function retrieves data from multiple Tushare endpoints including:
+        - daily_basic: PE, PB, PS ratios, market cap, shares outstanding
+        - fina_indicator: Financial indicators and ratios
+        - top10_holders: Top 10 shareholders information
+        - income: Income statement data
+        - balancesheet: Balance sheet data
+        - cashflow: Cash flow statement data
+
+        Args:
+            ticker (str): Stock ticker symbol (Chinese stocks)
+            curr_date (str): Current date for analysis
+        Returns:
+            str: Comprehensive fundamental analysis report
+        """
+
+        tushare_fundamentals_results = interface.get_fundamentals_tushare(
+            ticker, curr_date
+        )
+
+        return tushare_fundamentals_results
+
+    @staticmethod
+    @tool
     def get_sina_global_financial_news(
         curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]
     ):
