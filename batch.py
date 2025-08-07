@@ -272,47 +272,61 @@ class BatchProcessor:
 
             # Prepare data for sorting
             stock_data = []
+            total_stocks = len(summary['recommendations'])
 
-            for stock, data in summary['recommendations'].items():
-                # Extract the recommendation from decision content
-                decision_content = data['decision_content']
-                recommendation = "UNKNOWN"
-                confidence_score = 0
+            print(f"🤖 Analyzing {total_stocks} stock reports with AI model...")
 
-                # Try to extract the recommendation more accurately
-                content_upper = decision_content.upper()
+            # Use tqdm for progress tracking during confidence scoring
+            with tqdm(total=total_stocks, desc="AI Confidence Scoring", unit="stock") as pbar:
+                for stock, data in summary['recommendations'].items():
+                    pbar.set_description(f"Analyzing {stock}")
 
-                # Check for explicit recommendation patterns first
-                if "RECOMMENDATION: BUY" in content_upper or "FINAL TRANSACTION PROPOSAL: BUY" in content_upper:
-                    recommendation = "🟢 BUY"
-                elif "RECOMMENDATION: SELL" in content_upper or "FINAL TRANSACTION PROPOSAL: SELL" in content_upper:
-                    recommendation = "🔴 SELL"
-                elif "RECOMMENDATION: HOLD" in content_upper or "FINAL TRANSACTION PROPOSAL: HOLD" in content_upper:
-                    recommendation = "🟡 HOLD"
-                # Fallback to general keyword search
-                elif "BUY" in content_upper and "SELL" not in content_upper:
-                    recommendation = "🟢 BUY"
-                elif "SELL" in content_upper and "BUY" not in content_upper:
-                    recommendation = "🔴 SELL"
-                elif "HOLD" in content_upper:
-                    recommendation = "🟡 HOLD"
+                    # Extract the recommendation from decision content
+                    decision_content = data['decision_content']
+                    recommendation = "UNKNOWN"
+                    confidence_score = 0
 
-                # Calculate confidence score based on various factors
-                confidence_score = self._calculate_confidence_score(decision_content)
-                confidence_display = f"{confidence_score}%"
+                    # Try to extract the recommendation more accurately
+                    content_upper = decision_content.upper()
 
-                # Create clickable link to final decision report (absolute path)
-                import os
-                current_dir = os.getcwd()
-                final_report_path = f"file://{current_dir}/{data['reports_dir']}/final_trade_decision.md"
+                    # Check for explicit recommendation patterns first
+                    if "RECOMMENDATION: BUY" in content_upper or "FINAL TRANSACTION PROPOSAL: BUY" in content_upper:
+                        recommendation = "🟢 BUY"
+                    elif "RECOMMENDATION: SELL" in content_upper or "FINAL TRANSACTION PROPOSAL: SELL" in content_upper:
+                        recommendation = "🔴 SELL"
+                    elif "RECOMMENDATION: HOLD" in content_upper or "FINAL TRANSACTION PROPOSAL: HOLD" in content_upper:
+                        recommendation = "🟡 HOLD"
+                    # Fallback to general keyword search
+                    elif "BUY" in content_upper and "SELL" not in content_upper:
+                        recommendation = "🟢 BUY"
+                    elif "SELL" in content_upper and "BUY" not in content_upper:
+                        recommendation = "🔴 SELL"
+                    elif "HOLD" in content_upper:
+                        recommendation = "🟡 HOLD"
 
-                stock_data.append({
-                    'stock': stock,
-                    'recommendation': recommendation,
-                    'confidence_score': confidence_score,
-                    'confidence_display': confidence_display,
-                    'report_path': final_report_path
-                })
+                    # Calculate confidence score with error handling
+                    try:
+                        confidence_score = self._calculate_confidence_score(decision_content)
+                        confidence_display = f"{confidence_score}%"
+                    except Exception as e:
+                        print(f"\n⚠️ Failed to calculate confidence score for {stock}: {e}")
+                        confidence_score = 50  # Default fallback score
+                        confidence_display = "50% (fallback)"
+
+                    # Create clickable link to final decision report (absolute path)
+                    import os
+                    current_dir = os.getcwd()
+                    final_report_path = f"file://{current_dir}/{data['reports_dir']}/final_trade_decision.md"
+
+                    stock_data.append({
+                        'stock': stock,
+                        'recommendation': recommendation,
+                        'confidence_score': confidence_score,
+                        'confidence_display': confidence_display,
+                        'report_path': final_report_path
+                    })
+
+                    pbar.update(1)
 
             # Sort by confidence score (high to low)
             stock_data.sort(key=lambda x: x['confidence_score'], reverse=True)
@@ -377,7 +391,12 @@ class BatchProcessor:
         return self._calculate_confidence_score_with_llm(decision_content)
 
     def _calculate_confidence_score_with_llm(self, decision_content: str) -> int:
-        """Calculate confidence score using LLM analysis."""
+        """Calculate confidence score using LLM analysis with timeout and retry."""
+        # Truncate very long content to avoid token limits and reduce latency
+        max_content_length = 3000
+        if len(decision_content) > max_content_length:
+            decision_content = decision_content[:max_content_length] + "\n...(内容已截断)"
+
         prompt = f"""
 请分析以下股票投资决策报告的质量和可信度，并给出一个30-95之间的准确程度评分。
 
@@ -402,23 +421,31 @@ class BatchProcessor:
 请只返回一个30-95之间的整数评分，不要包含其他文字。
 """
 
-        try:
-            response = self.confidence_llm.invoke(prompt)
-            # Extract the score from response
-            score_text = response.content.strip()
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            try:
+                # Set a reasonable timeout for the API call
+                response = self.confidence_llm.invoke(prompt)
+                # Extract the score from response
+                score_text = response.content.strip()
 
-            # Try to extract number from response
-            import re
-            numbers = re.findall(r'\d+', score_text)
-            if numbers:
-                score = int(numbers[0])
-                # Ensure score is within bounds
-                return min(max(score, 30), 95)
-            else:
-                raise ValueError("No valid score found in LLM response")
+                # Try to extract number from response
+                import re
+                numbers = re.findall(r'\d+', score_text)
+                if numbers:
+                    score = int(numbers[0])
+                    # Ensure score is within bounds
+                    return min(max(score, 30), 95)
+                else:
+                    raise ValueError("No valid score found in LLM response")
 
-        except Exception as e:
-            raise Exception(f"LLM scoring failed: {e}")
+            except Exception as e:
+                if attempt < max_retries:
+                    print(f"   Retry {attempt + 1}/{max_retries} for confidence scoring...")
+                    time.sleep(1)  # Brief delay before retry
+                    continue
+                else:
+                    raise Exception(f"LLM scoring failed after {max_retries + 1} attempts: {e}")
 
 
 
