@@ -1868,12 +1868,16 @@ def _format_comprehensive_fundamental_report(result: dict) -> str:
     return report
 
 
-def get_sina_global_financial_news(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
+def get_sina_global_financial_news(
+    curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"],
+    max_records: Annotated[int, "maximum number of records to return"] = 5
+) -> str:
     """
     获取新浪财经全球财经快讯
 
     Args:
         curr_date (str): current date you are trading at, yyyy-mm-dd
+        max_records (int): maximum number of records to return, default is 5
 
     Returns:
         str: 格式化的全球财经快讯字符串，包含时间和内容
@@ -1928,8 +1932,15 @@ def get_sina_global_financial_news(curr_date: Annotated[str, "current date you a
         if not filtered_news:
             return f"暂无 {curr_date} 当天的新浪财经全球财经快讯数据"
 
+        # 限制返回记录数量
+        original_count = len(filtered_news)
+        if len(filtered_news) > max_records:
+            filtered_news = filtered_news[:max_records]
+
         # 格式化输出
         news_str = f"## 新浪财经-全球财经快讯 ({curr_date})\n\n"
+        if original_count > max_records:
+            news_str += f"*显示最新 {max_records} 条记录（共 {original_count} 条）*\n\n"
 
         for time_str, content in filtered_news:
             news_str += f"**{time_str}**\n{content}\n\n"
@@ -1940,12 +1951,16 @@ def get_sina_global_financial_news(curr_date: Annotated[str, "current date you a
         return f"获取新浪财经全球财经快讯时发生错误: {str(e)}"
 
 
-def get_eastmoney_financial_breakfast(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
+def get_eastmoney_financial_breakfast(
+    curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"],
+    max_records: Annotated[int, "maximum number of records to return"] = 5
+) -> str:
     """
     获取东方财富财经早餐
 
     Args:
         curr_date (str): current date you are trading at, yyyy-mm-dd
+        max_records (int): maximum number of records to return, default is 5
 
     Returns:
         str: 格式化的财经早餐字符串，包含标题、摘要、发布时间和链接
@@ -1996,8 +2011,15 @@ def get_eastmoney_financial_breakfast(curr_date: Annotated[str, "current date yo
         if not filtered_news:
             return f"暂无 {curr_date} 当天的东方财富财经早餐数据"
 
+        # 限制返回记录数量
+        original_count = len(filtered_news)
+        if len(filtered_news) > max_records:
+            filtered_news = filtered_news[:max_records]
+
         # 格式化输出
         breakfast_str = f"## 东方财富-财经早餐 ({curr_date})\n\n"
+        if original_count > max_records:
+            breakfast_str += f"*显示最新 {max_records} 条记录（共 {original_count} 条）*\n\n"
 
         for title, summary, publish_time, link in filtered_news:
             breakfast_str += f"### {title}\n"
@@ -2012,12 +2034,16 @@ def get_eastmoney_financial_breakfast(curr_date: Annotated[str, "current date yo
         return f"获取东方财富财经早餐时发生错误: {str(e)}"
 
 
-def get_eastmoney_global_financial_news(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
+def get_eastmoney_global_financial_news(
+    curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"],
+    max_records: Annotated[int, "maximum number of records to return"] = 5
+) -> str:
     """
     获取东方财富全球财经快讯
 
     Args:
         curr_date (str): current date you are trading at, yyyy-mm-dd
+        max_records (int): maximum number of records to return, default is 5
 
     Returns:
         str: 格式化的全球财经快讯字符串，包含标题、摘要、发布时间和链接
@@ -2068,8 +2094,15 @@ def get_eastmoney_global_financial_news(curr_date: Annotated[str, "current date 
         if not filtered_news:
             return f"暂无 {curr_date} 当天的东方财富全球财经快讯数据"
 
+        # 限制返回记录数量
+        original_count = len(filtered_news)
+        if len(filtered_news) > max_records:
+            filtered_news = filtered_news[:max_records]
+
         # 格式化输出
         news_str = f"## 东方财富-全球财经快讯 ({curr_date})\n\n"
+        if original_count > max_records:
+            news_str += f"*显示最新 {max_records} 条记录（共 {original_count} 条）*\n\n"
 
         for title, summary, publish_time, link in filtered_news:
             news_str += f"### {title}\n"
@@ -2084,12 +2117,16 @@ def get_eastmoney_global_financial_news(curr_date: Annotated[str, "current date 
         return f"获取东方财富全球财经快讯时发生错误: {str(e)}"
 
 
-def get_futu_financial_news(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
+def get_futu_financial_news(
+    curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"],
+    max_records: Annotated[int, "maximum number of records to return"] = 5
+) -> str:
     """
     获取富途牛牛快讯
 
     Args:
         curr_date (str): current date you are trading at, yyyy-mm-dd
+        max_records (int): maximum number of records to return, default is 5
 
     Returns:
         str: 格式化的富途牛牛快讯字符串，包含标题、内容、发布时间和链接
@@ -2140,8 +2177,15 @@ def get_futu_financial_news(curr_date: Annotated[str, "current date you are trad
         if not filtered_news:
             return f"暂无 {curr_date} 当天的富途牛牛快讯数据"
 
+        # 限制返回记录数量
+        original_count = len(filtered_news)
+        if len(filtered_news) > max_records:
+            filtered_news = filtered_news[:max_records]
+
         # 格式化输出
         news_str = f"## 富途牛牛-快讯 ({curr_date})\n\n"
+        if original_count > max_records:
+            news_str += f"*显示最新 {max_records} 条记录（共 {original_count} 条）*\n\n"
 
         for title, content, publish_time, link in filtered_news:
             news_str += f"### {title}\n"
@@ -2156,12 +2200,16 @@ def get_futu_financial_news(curr_date: Annotated[str, "current date you are trad
         return f"获取富途牛牛快讯时发生错误: {str(e)}"
 
 
-def get_tonghuashun_global_financial_live(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
+def get_tonghuashun_global_financial_live(
+    curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"],
+    max_records: Annotated[int, "maximum number of records to return"] = 5
+) -> str:
     """
     获取同花顺全球财经直播
 
     Args:
         curr_date (str): current date you are trading at, yyyy-mm-dd
+        max_records (int): maximum number of records to return, default is 5
 
     Returns:
         str: 格式化的同花顺全球财经直播字符串，包含标题、内容、发布时间和链接
@@ -2212,8 +2260,15 @@ def get_tonghuashun_global_financial_live(curr_date: Annotated[str, "current dat
         if not filtered_news:
             return f"暂无 {curr_date} 当天的同花顺全球财经直播数据"
 
+        # 限制返回记录数量
+        original_count = len(filtered_news)
+        if len(filtered_news) > max_records:
+            filtered_news = filtered_news[:max_records]
+
         # 格式化输出
         news_str = f"## 同花顺财经-全球财经直播 ({curr_date})\n\n"
+        if original_count > max_records:
+            news_str += f"*显示最新 {max_records} 条记录（共 {original_count} 条）*\n\n"
 
         for title, content, publish_time, link in filtered_news:
             news_str += f"### {title}\n"
@@ -2228,12 +2283,16 @@ def get_tonghuashun_global_financial_live(curr_date: Annotated[str, "current dat
         return f"获取同花顺全球财经直播时发生错误: {str(e)}"
 
 
-def get_cailianshe_telegraph(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
+def get_cailianshe_telegraph(
+    curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"],
+    max_records: Annotated[int, "maximum number of records to return"] = 5
+) -> str:
     """
     获取财联社电报
 
     Args:
         curr_date (str): current date you are trading at, yyyy-mm-dd
+        max_records (int): maximum number of records to return, default is 5
 
     Returns:
         str: 格式化的财联社电报字符串，包含标题、内容、发布日期和发布时间
@@ -2269,8 +2328,15 @@ def get_cailianshe_telegraph(curr_date: Annotated[str, "current date you are tra
         if not filtered_news:
             return f"暂无 {curr_date} 当天的财联社电报数据"
 
+        # 限制返回记录数量
+        original_count = len(filtered_news)
+        if len(filtered_news) > max_records:
+            filtered_news = filtered_news[:max_records]
+
         # 格式化输出
         news_str = f"## 财联社-电报 ({curr_date})\n\n"
+        if original_count > max_records:
+            news_str += f"*显示最新 {max_records} 条记录（共 {original_count} 条）*\n\n"
 
         for title, content, publish_date, publish_time in filtered_news:
             news_str += f"### {title}\n"
@@ -2284,12 +2350,16 @@ def get_cailianshe_telegraph(curr_date: Annotated[str, "current date you are tra
         return f"获取财联社电报时发生错误: {str(e)}"
 
 
-def get_sina_securities_original(curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"]) -> str:
+def get_sina_securities_original(
+    curr_date: Annotated[str, "current date you are trading at, yyyy-mm-dd"],
+    max_records: Annotated[int, "maximum number of records to return"] = 5
+) -> str:
     """
     获取新浪财经证券原创
 
     Args:
         curr_date (str): current date you are trading at, yyyy-mm-dd
+        max_records (int): maximum number of records to return, default is 5
 
     Returns:
         str: 格式化的新浪财经证券原创字符串，包含时间、内容和链接
@@ -2345,8 +2415,15 @@ def get_sina_securities_original(curr_date: Annotated[str, "current date you are
         if not filtered_news:
             return f"暂无 {curr_date} 当天的新浪财经证券原创数据"
 
+        # 限制返回记录数量
+        original_count = len(filtered_news)
+        if len(filtered_news) > max_records:
+            filtered_news = filtered_news[:max_records]
+
         # 格式化输出
         news_str = f"## 新浪财经-证券原创 ({curr_date})\n\n"
+        if original_count > max_records:
+            news_str += f"*显示最新 {max_records} 条记录（共 {original_count} 条）*\n\n"
 
         for time, content, link in filtered_news:
             news_str += f"### {content}\n"
