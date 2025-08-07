@@ -41,6 +41,7 @@ def get_google_news(
     query: Annotated[str, "Query to search with"],
     curr_date: Annotated[str, "Curr date in yyyy-mm-dd format"],
     look_back_days: Annotated[int, "how many days to look back"],
+    max_pages: Annotated[int, "Maximum number of pages to scrape"] = 5,
 ) -> str:
     query = query.replace(" ", "+")
 
@@ -48,7 +49,7 @@ def get_google_news(
     before = start_date - relativedelta(days=look_back_days)
     before = before.strftime("%Y-%m-%d")
 
-    news_results = getNewsData(query, before, curr_date)
+    news_results = getNewsData(query, before, curr_date, max_pages)
 
     news_str = ""
 
