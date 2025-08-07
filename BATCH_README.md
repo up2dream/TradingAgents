@@ -23,6 +23,45 @@ uv sync
 uv add pyyaml tqdm
 ```
 
+## 环境配置
+
+### API 密钥配置
+
+批量分析工具需要配置相应的 API 密钥才能正常工作。
+
+#### 方法一：使用 .env 文件（推荐）
+
+1. 复制示例配置文件：
+```bash
+cp .env.example .env
+```
+
+2. 编辑 `.env` 文件，填入你的 API 密钥：
+```bash
+# OpenAI API Key (required for OpenAI models)
+OPENAI_API_KEY=your-openai-api-key-here
+
+# Google/Gemini API Key (required for Google models)
+GOOGLE_API_KEY=your-google-api-key-here
+GEMINI_API_KEY=your-gemini-api-key-here
+
+# Anthropic API Key (required for Claude models)
+ANTHROPIC_API_KEY=your-anthropic-api-key-here
+
+# Tushare Token (required for Chinese stock data)
+TUSHARE_TOKEN=your-tushare-token-here
+```
+
+#### 方法二：设置环境变量
+
+```bash
+export OPENAI_API_KEY="your-openai-api-key"
+export GOOGLE_API_KEY="your-google-api-key"
+export TUSHARE_TOKEN="your-tushare-token"
+```
+
+⚠️ **注意**: 如果没有正确配置 API 密钥，批量分析将无法启动。
+
 ## 使用方法
 
 ### 1. 运行批量分析

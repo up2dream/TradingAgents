@@ -21,6 +21,16 @@ from datetime import datetime, date
 from typing import List, Dict, Any, Optional
 import shutil
 from tqdm import tqdm
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Import LLM classes and config for confidence scoring
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
+from tradingagents.default_config import DEFAULT_CONFIG
 
 # Default configuration file
 CONFIG_FILE = "batch_config.yaml"
@@ -35,6 +45,22 @@ class BatchProcessor:
         self.config = self.load_config()
         self.trade_date = self._validate_and_set_trade_date(trade_date)
 
+        # Initialize LLM for confidence scoring (using same config as main.py)
+        self.llm_config = self._get_llm_config()
+        try:
+            self.confidence_llm = self._initialize_llm()
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to initialize LLM for confidence scoring: {e}\n"
+                f"Please ensure the required API keys are properly configured:\n"
+                f"- Create a .env file in the project root directory\n"
+                f"- Add the appropriate API key:\n"
+                f"  * For OpenAI: OPENAI_API_KEY=your-api-key\n"
+                f"  * For Anthropic: ANTHROPIC_API_KEY=your-api-key\n"
+                f"  * For Google: GOOGLE_API_KEY=your-api-key or GEMINI_API_KEY=your-api-key\n"
+                f"- Or set the environment variable directly in your shell"
+            )
+
     def _validate_and_set_trade_date(self, trade_date: Optional[str]) -> str:
         """Validate and set the trade date."""
         if trade_date is None:
@@ -46,6 +72,33 @@ class BatchProcessor:
             return trade_date
         except ValueError:
             raise ValueError(f"Invalid date format: {trade_date}. Please use YYYY-MM-DD format.")
+
+    def _get_llm_config(self) -> Dict[str, Any]:
+        """Get LLM configuration matching main.py settings."""
+        # Create a custom config matching main.py
+        config = DEFAULT_CONFIG.copy()
+        config["llm_provider"] = "openai"
+        config["deep_think_llm"] = "o4-mini"
+        config["quick_think_llm"] = "gpt-4o-mini"
+        config["backend_url"] = "https://api.gptsapi.net/v1"
+        return config
+
+    def _initialize_llm(self):
+        """Initialize LLM for confidence scoring based on provider."""
+        if self.llm_config["llm_provider"].lower() == "openai":
+            return ChatOpenAI(
+                model=self.llm_config["quick_think_llm"],
+                base_url=self.llm_config["backend_url"]
+            )
+        elif self.llm_config["llm_provider"].lower() == "anthropic":
+            return ChatAnthropic(
+                model=self.llm_config["quick_think_llm"],
+                base_url=self.llm_config["backend_url"]
+            )
+        elif self.llm_config["llm_provider"].lower() == "google":
+            return ChatGoogleGenerativeAI(model=self.llm_config["quick_think_llm"])
+        else:
+            raise ValueError(f"Unsupported LLM provider: {self.llm_config['llm_provider']}")
         
     def load_config(self) -> Dict[str, Any]:
         """Load configuration from yaml file."""
@@ -273,7 +326,8 @@ class BatchProcessor:
 
             f.write("\n---\n\n")
             f.write("💡 **说明**: \n")
-            f.write("- 建议准确程度基于分析的详细程度、技术指标一致性和风险评估完整性计算\n")
+            f.write("- 建议准确程度由AI大模型分析投资决策报告质量生成，评分范围30-95分\n")
+            f.write("- 评分考虑因素：建议明确性、技术分析深度、风险管理、推理逻辑、多角度分析等\n")
             f.write("- 点击\"查看详细分析\"链接可查看完整的投资决策依据和分析过程\n")
             f.write("- 表格已按建议准确程度从高到低排序\n\n")
         
@@ -316,61 +370,57 @@ class BatchProcessor:
         return summary_file
 
     def _calculate_confidence_score(self, decision_content: str) -> int:
-        """Calculate confidence score based on decision content analysis."""
-        score = 50  # Base score
-        content_upper = decision_content.upper()
+        """Calculate confidence score using LLM analysis."""
+        if self.confidence_llm is None:
+            raise RuntimeError("LLM not initialized. Please ensure API keys are properly configured.")
 
-        # Factor 1: Explicit recommendation patterns (+20 points)
-        if any(pattern in content_upper for pattern in [
-            "RECOMMENDATION:", "FINAL TRANSACTION PROPOSAL:", "DECISION & RATIONALE"
-        ]):
-            score += 20
+        return self._calculate_confidence_score_with_llm(decision_content)
 
-        # Factor 2: Technical analysis depth (+15 points)
-        technical_indicators = [
-            "MACD", "RSI", "SMA", "EMA", "ATR", "P/E", "VOLUME", "MOVING AVERAGE"
-        ]
-        technical_count = sum(1 for indicator in technical_indicators if indicator in content_upper)
-        score += min(technical_count * 2, 15)
+    def _calculate_confidence_score_with_llm(self, decision_content: str) -> int:
+        """Calculate confidence score using LLM analysis."""
+        prompt = f"""
+请分析以下股票投资决策报告的质量和可信度，并给出一个30-95之间的准确程度评分。
 
-        # Factor 3: Risk management discussion (+10 points)
-        risk_keywords = [
-            "RISK", "STOP LOSS", "VOLATILITY", "DOWNSIDE", "HEDGE", "PROTECTION"
-        ]
-        risk_count = sum(1 for keyword in risk_keywords if keyword in content_upper)
-        score += min(risk_count * 2, 10)
+评分标准：
+- 30-50分：分析简单，缺乏深度，建议不明确
+- 51-65分：分析基本完整，有一定依据，但缺乏细节
+- 66-80分：分析较为全面，有技术指标支持，风险考虑充分
+- 81-95分：分析非常详细，多角度论证，风险管理完善，建议明确
 
-        # Factor 4: Detailed reasoning (+10 points)
-        reasoning_keywords = [
-            "RATIONALE", "BECAUSE", "DUE TO", "GIVEN", "CONSIDERING", "ANALYSIS"
-        ]
-        reasoning_count = sum(1 for keyword in reasoning_keywords if keyword in content_upper)
-        score += min(reasoning_count, 10)
+请重点考虑以下因素：
+1. 投资建议的明确性和具体性
+2. 技术分析的深度（技术指标使用情况）
+3. 风险管理和止损策略的完整性
+4. 推理逻辑的严密性和论证的充分性
+5. 多角度分析（牛熊观点、不同视角）
+6. 具体的执行计划和目标设定
+7. 分析内容的详细程度和专业性
 
-        # Factor 5: Multiple perspectives (+5 points)
-        perspective_keywords = [
-            "BULL", "BEAR", "ANALYST", "DEBATE", "ARGUMENT", "PERSPECTIVE"
-        ]
-        if any(keyword in content_upper for keyword in perspective_keywords):
-            score += 5
+投资决策报告内容：
+{decision_content}
 
-        # Factor 6: Specific targets and plans (+5 points)
-        plan_keywords = [
-            "TARGET", "PLAN", "STRATEGY", "ENTRY", "EXIT", "ALLOCATION"
-        ]
-        plan_count = sum(1 for keyword in plan_keywords if keyword in content_upper)
-        if plan_count >= 2:
-            score += 5
+请只返回一个30-95之间的整数评分，不要包含其他文字。
+"""
 
-        # Factor 7: Length and detail bonus (longer analysis = more thorough)
-        content_length = len(decision_content)
-        if content_length > 2000:
-            score += 5
-        elif content_length > 1000:
-            score += 3
+        try:
+            response = self.confidence_llm.invoke(prompt)
+            # Extract the score from response
+            score_text = response.content.strip()
 
-        # Ensure score is within reasonable bounds
-        return min(max(score, 30), 95)
+            # Try to extract number from response
+            import re
+            numbers = re.findall(r'\d+', score_text)
+            if numbers:
+                score = int(numbers[0])
+                # Ensure score is within bounds
+                return min(max(score, 30), 95)
+            else:
+                raise ValueError("No valid score found in LLM response")
+
+        except Exception as e:
+            raise Exception(f"LLM scoring failed: {e}")
+
+
 
     def run_batch_analysis(self):
         """Run batch analysis for all stocks in configuration."""
