@@ -93,10 +93,15 @@ def main():
     config["max_debate_rounds"] = 1  # Increase debate rounds
     config["online_tools"] = True  # Increase debate rounds
 
-    config["llm_provider"] = "openai"
-    config["deep_think_llm"] = "o4-mini"
-    config["quick_think_llm"] = "gpt-4o-mini"
-    config["backend_url"] = "https://api.gptsapi.net/v1"
+    # config["llm_provider"] = "openai"
+    # config["deep_think_llm"] = "o4-mini"
+    # config["quick_think_llm"] = "gpt-4o-mini"
+    # config["backend_url"] = "https://api.gptsapi.net/v1"
+
+    config["llm_provider"] = "ollama"
+    config["deep_think_llm"] = "qwen3"
+    config["quick_think_llm"] = "qwen3"
+    config["backend_url"] = "http://localhost:11434/v1"
 
     # Print configuration information
     print_config_info(config)
